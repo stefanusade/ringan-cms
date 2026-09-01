@@ -1,0 +1,23 @@
+Options -Indexes
+DirectoryIndex index.php
+
+# Cegah mod_dir me-redirect direktori dengan 301 (mis. /install → /install/).
+# Redirect 301 pada request POST akan mengubah metode jadi GET dan menghapus
+# data form. Semua request non-/public/ sudah diarahkan ke front controller,
+# jadi redirect trailing slash tidak diperlukan.
+DirectorySlash Off
+
+<FilesMatch "\.(env|log|sql)$">
+  Require all denied
+</FilesMatch>
+
+# Mode sub-folder (document root di folder parent, mis. /var/www/html):
+# semua request dialihkan ke front controller public/index.php.
+# File di dalam public/ tetap dilayani langsung oleh Apache.
+# Mode standar (document root = /public) tidak terpengaruh karena
+# file ini berada di luar document root.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !/public/
+    RewriteRule ^ public/index.php [L]
+</IfModule>

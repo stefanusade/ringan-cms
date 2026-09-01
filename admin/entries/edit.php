@@ -1,0 +1,209 @@
+<?php
+/**
+ * Edit entri.
+ */
+
+declare(strict_types=1);
+
+if (!defined('APP_ROOT')) {
+    define('APP_ROOT', dirname(__DIR__, 2));
+}
+require_once APP_ROOT . '/config/config.php';
+require_once APP_ROOT . '/config/db.php';
+require_once APP_ROOT . '/includes/auth.php';
+require_once APP_ROOT . '/includes/permissions.php';
+require_once APP_ROOT . '/includes/response.php';
+require_once APP_ROOT . '/includes/content_types.php';
+require_once APP_ROOT . '/includes/content_entries.php';
+require_once APP_ROOT . '/includes/render.php';
+require_once APP_ROOT . '/includes/upload.php';
+require_once APP_ROOT . '/includes/audit_log.php';
+require_once APP_ROOT . '/includes/taxonomies.php';
+require_once APP_ROOT . '/admin/partials/header.php';
+require_once APP_ROOT . '/admin/partials/footer.php';
+
+$user = require_login();
+if (!can_write_entries($user)) {
+    http_response_code(403);
+    exit('403 — Anda tidak memiliki akses untuk menulis entri.');
+}
+
+$id = (int) ($_GET['id'] ?? 0);
+$ct_id = (int) ($_GET['content_type'] ?? 0);
+$ct = get_content_type($ct_id);
+if ($ct === null) {
+    http_response_code(404);
+    exit('Content type tidak ditemukan.');
+}
+$entry = get_entry_for_content_type($id, $ct_id);
+if ($entry === null) {
+    http_response_code(404);
+    exit('Entri tidak ditemukan.');
+}
+$fields = get_fields($ct_id);
+$existing = decode_entry_data($entry);
+$taxonomies = get_taxonomies_with_terms($ct_id);
+$entry_term_ids = [];
+foreach (get_entry_terms($id) as $et) {
+    $entry_term_ids[(int) $et['taxonomy_id']][] = (int) $et['term_id'];
+}
+
+$errors = [];
+$form_data = $existing;
+$form_status = $entry['status'];
+$upload_errors = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_csrf();
+    $raw = is_array($_POST['data'] ?? null) ? $_POST['data'] : [];
+    $files = $_FILES['data_file'] ?? [];
+    $delete_files = is_array($_POST['data_delete_file'] ?? null) ? $_POST['data_delete_file'] : [];
+    $delete_gallery = is_array($_POST['data_delete_gallery'] ?? null) ? $_POST['data_delete_gallery'] : [];
+    $form_status = sanitize_text($_POST['status'] ?? $entry['status']);
+    if (!in_array($form_status, entry_statuses(), true)) {
+        $form_status = $entry['status'];
+    }
+
+    $payload = [];
+    foreach ($fields as $field) {
+        $key = $field['field_key'];
+        $type = $field['field_type'];
+        $current = $existing[$key] ?? null;
+        if ($type === 'gallery') {
+            $gallery_current = is_array($current) ? $current : [];
+            $delete_ix = isset($delete_gallery[$key]) && is_array($delete_gallery[$key]) ? array_map('intval', $delete_gallery[$key]) : [];
+            $kept = [];
+            foreach ($gallery_current as $gi => $gpath) {
+                if (in_array($gi, $delete_ix, true)) {
+                    delete_upload($gpath);
+                } else {
+                    $kept[] = $gpath;
+                }
+            }
+            $uploaded = [];
+            if (isset($files['name'][$key]) && is_array($files['name'][$key])) {
+                $count = count($files['name'][$key]);
+                for ($gi = 0; $gi < $count; $gi++) {
+                    $gfile = [
+                        'name' => $files['name'][$key][$gi],
+                        'type' => $files['type'][$key][$gi] ?? '',
+                        'tmp_name' => $files['tmp_name'][$key][$gi] ?? '',
+                        'error' => $files['error'][$key][$gi] ?? UPLOAD_ERR_NO_FILE,
+                        'size' => $files['size'][$key][$gi] ?? 0,
+                    ];
+                    if ($gfile['error'] !== UPLOAD_ERR_NO_FILE) {
+                        $gup = handle_upload($gfile, true);
+                        if ($gup['ok']) {
+                            $uploaded[] = $gup['path'];
+                        } else {
+                            $upload_errors[$key] = array_merge($upload_errors[$key] ?? [], [$gup['error']]);
+                        }
+                    }
+                }
+            }
+            $payload[$key] = array_values(array_merge($kept, $uploaded));
+        } elseif (in_array($type, ['image', 'file'], true)) {
+            $has_file = isset($files['name'][$key]) && is_string($files['name'][$key]) && $files['name'][$key] !== '';
+            $delete = !empty($delete_files[$key]);
+            if ($has_file) {
+                $upload = handle_upload([
+                    'name' => $files['name'][$key],
+                    'type' => $files['type'][$key] ?? '',
+                    'tmp_name' => $files['tmp_name'][$key] ?? '',
+                    'error' => $files['error'][$key] ?? UPLOAD_ERR_NO_FILE,
+                    'size' => $files['size'][$key] ?? 0,
+                ], $type === 'image');
+                if ($upload['ok']) {
+                    if (is_string($current) && $current !== '') {
+                        delete_upload($current);
+                    }
+                    $payload[$key] = $upload['path'];
+                } else {
+                    $upload_errors[$key] = [$upload['error']];
+                }
+            } elseif ($delete) {
+                if (is_string($current) && $current !== '') {
+                    delete_upload($current);
+                }
+                $payload[$key] = null;
+            } else {
+                $payload[$key] = $current;
+            }
+        } elseif (array_key_exists($key, $raw)) {
+            $payload[$key] = $raw[$key];
+        } else {
+            $payload[$key] = $current;
+        }
+        $form_data[$key] = $payload[$key] ?? null;
+    }
+
+    $result = validate_entry_payload($payload, $fields, false);
+    $errors = $result['errors'];
+    foreach ($upload_errors as $k => $msgs) {
+        $errors[$k] = array_merge($errors[$k] ?? [], $msgs);
+    }
+
+    $term_ids_by_tax = collect_entry_terms_from_post($taxonomies, $_POST);
+
+    if ($errors === []) {
+        update_entry($id, $result['data'], $form_status);
+        $all_term_ids = [];
+        foreach ($term_ids_by_tax as $ids) {
+            $all_term_ids = array_merge($all_term_ids, $ids);
+        }
+        set_entry_terms($id, $all_term_ids);
+        log_audit('update_entry', 'content_entries', (string) $id, (int) $user['id']);
+        flash_set('success', 'Entri #' . $id . ' diperbarui.');
+        redirect_admin('entries?content_type=' . $ct_id);
+    }
+}
+
+admin_header('Edit Entri #' . $id . ': ' . $ct['label'], 'entries');
+?>
+<p class="muted">Content Type: <strong><?= e($ct['label']) ?></strong> — <a href="<?= e(admin_url('entries?content_type=' . $ct_id)) ?>">kembali</a></p>
+<form method="post" action="<?= e(admin_url('entries/edit?id=' . $id . '&content_type=' . $ct_id)) ?>" enctype="multipart/form-data" class="card">
+  <?= csrf_field() ?>
+  <?= render_errors($errors) ?>
+  <?php foreach ($fields as $field): ?>
+    <?php $value = $form_data[$field['field_key']] ?? null; ?>
+    <div class="form-group">
+      <label for="field_<?= e($field['field_key']) ?>"><?= e($field['label']) ?><?= $field['is_required'] ? ' <span class="req">*</span>' : '' ?></label>
+      <?= render_field_input($field, $value) ?>
+    </div>
+  <?php endforeach; ?>
+  <?php if ($taxonomies !== []): ?>
+  <div class="form-group">
+    <label>Taksonomi</label>
+    <?php foreach ($taxonomies as $tax): ?>
+      <div class="taxonomy-box">
+        <strong><?= e($tax['label']) ?></strong>
+        <div class="taxonomy-options">
+          <?php if ($tax['terms'] === []): ?>
+            <span class="muted">Belum ada term — <a href="<?= e(admin_url('content-types/terms?taxonomy=' . (int) $tax['id'])) ?>" target="_blank" rel="noopener">kelola term</a>.</span>
+          <?php else: ?>
+            <?php foreach ($tax['terms'] as $term): ?>
+              <label class="checkbox-inline">
+                <input type="checkbox" name="terms[<?= (int) $tax['id'] ?>][]" value="<?= (int) $term['id'] ?>"<?= in_array((int) $term['id'], $entry_term_ids[(int) $tax['id']] ?? [], true) ? ' checked' : '' ?>>
+                <?= e($term['name']) ?>
+              </label>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </div>
+        <small class="hint">Term baru (pisah koma): <input type="text" class="taxonomy-new" name="new_terms[<?= (int) $tax['id'] ?>]" placeholder="mis. Berita, Opini" autocomplete="off"></small>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
+  <div class="form-group">
+    <label for="status">Status</label>
+    <select id="status" name="status">
+      <?php foreach (entry_statuses() as $s): ?>
+        <option value="<?= e($s) ?>"<?= $form_status === $s ? ' selected' : '' ?>><?= e($s) ?></option>
+      <?php endforeach; ?>
+    </select>
+  </div>
+  <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+  <a class="btn" href="<?= e(admin_url('entries?content_type=' . $ct_id)) ?>">Batal</a>
+</form>
+<?php
+admin_footer();

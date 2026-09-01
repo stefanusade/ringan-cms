@@ -1,0 +1,5 @@
+# Sama seperti admin/.htaccess: folder install/ harus bisa dilewati request
+# agar /install (wizard) berfungsi pada Mode B (sub-folder). Jangan pasang
+# "Require all denied" di sini. Akses langsung ke install/index.php via URL
+# tetap aman: rewrite root → front controller → 404 (bukan route).
+# Setelah instalasi selesai, folder install/ sebaiknya dihapus.

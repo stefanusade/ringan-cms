@@ -1,0 +1,10 @@
+# Mode A (docroot = /public): folder ini di luar webroot — aturan Apache tidak
+# diperlukan.
+#
+# Mode B (sub-folder, mis. localhost/ringan-cms/): request /admin/* DILEWATKAN
+# ke front controller oleh .htaccess di root project. JANGAN pasang
+# "Require all denied" di sini — Apache memeriksa Require SEBELUM mod_rewrite
+# per-directory, sehingga routing /admin/login dkk. akan gagal 403.
+# File PHP di folder ini tidak bisa dieksekusi langsung via URL: rewrite root
+# mengalihkan semua request non-/public/ ke public/index.php, dan path
+# /admin/*.php bukan route → 404.

@@ -1,0 +1,9 @@
+.env
+/vendor/
+/storage/uploads/*
+/storage/logs/*
+!/storage/uploads/.htaccess
+!/storage/uploads/index.html
+!/storage/logs/.htaccess
+!/storage/logs/index.html
+*.log
