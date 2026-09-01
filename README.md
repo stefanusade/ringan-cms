@@ -241,7 +241,11 @@ curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts?tax=category&
 
 - Menu **Updates** di dashboard menampilkan versi terbaru (cache 6 jam) dan
   tombol update interaktif.
-- Aktifkan dengan mengisi **Update URL** di Settings — URL manifest JSON:
+- **Default** Update URL diarahkan ke GitHub Releases project ini
+  (`https://api.github.com/repos/stefanusade/ringan-cms/releases/latest`).
+  Syarat: repo harus **publik**, dan setiap release wajib memiliki **file
+  paket `.zip`** sebagai asset (checksum SHA-256 dari GitHub otomatis
+  diverifikasi). Bisa diganti dengan manifest JSON kustom:
   `{ "version": "1.2.0", "url": "https://…/ringan-cms-1.2.0.zip", "checksum": "sha256-hex", "changelog": "…" }`.
 - Proses update: backup otomatis (storage/backups) → unduh paket → verifikasi
   checksum SHA-256 → ekstrak aman (anti zip-slip) → salin file (`.env`,

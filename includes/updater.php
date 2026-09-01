@@ -57,6 +57,40 @@ function http_get(string $url, int $timeout = 10): ?string
     return is_string($body) ? $body : null;
 }
 
+function parse_github_release(string $json): ?array
+{
+    $data = json_decode($json, true);
+    if (!is_array($data) || empty($data['tag_name']) || !is_string($data['tag_name'])) {
+        return null;
+    }
+    $version = ltrim($data['tag_name'], 'v');
+    // Cari asset .zip + digest SHA-256 (disediakan GitHub untuk release assets).
+    $zip = null;
+    $digest = '';
+    if (isset($data['assets']) && is_array($data['assets'])) {
+        foreach ($data['assets'] as $asset) {
+            if (is_array($asset) && !empty($asset['browser_download_url'])
+                && str_ends_with(strtolower((string) ($asset['name'] ?? '')), '.zip')) {
+                $zip = $asset['browser_download_url'];
+                $digest = (string) ($asset['digest'] ?? '');
+                break;
+            }
+        }
+    }
+    if ($zip === null) {
+        return null; // release tanpa asset zip — tidak bisa di-update
+    }
+    if (!preg_match('/^sha256:([a-f0-9]{64})$/i', $digest, $m)) {
+        return null; // wajib checksum SHA-256
+    }
+    return [
+        'version' => $version,
+        'url' => $zip,
+        'checksum' => strtolower($m[1]),
+        'changelog' => isset($data['body']) && is_string($data['body']) ? $data['body'] : '',
+    ];
+}
+
 function parse_update_manifest(string $json): ?array
 {
     $data = json_decode($json, true);
@@ -95,6 +129,9 @@ function get_update_manifest(bool $force = false): ?array
             $cached = get_setting('update_cache', '');
             if ($cached !== '') {
                 $parsed = parse_update_manifest($cached);
+                if ($parsed === null) {
+                    $parsed = parse_github_release($cached);
+                }
                 if ($parsed !== null) {
                     return $parsed;
                 }
@@ -105,7 +142,11 @@ function get_update_manifest(bool $force = false): ?array
     if ($body === null || $body === '') {
         return null;
     }
+    // Dukung dua format: manifest kustom ATAU respons GitHub Releases API.
     $manifest = parse_update_manifest($body);
+    if ($manifest === null) {
+        $manifest = parse_github_release($body);
+    }
     if ($manifest !== null) {
         set_setting('update_cache', $body);
         set_setting('update_cache_at', (string) time());
