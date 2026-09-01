@@ -10,4 +10,6 @@ INSERT IGNORE INTO settings (setting_key, setting_value) VALUES
   ('site_title', 'Ringan CMS'),
   ('site_tagline', ''),
   ('site_description', ''),
-  ('site_favicon', '');
+  ('site_favicon', ''),
+  ('site_timezone', 'Asia/Jakarta'),
+  ('api_path', 'api/v1');

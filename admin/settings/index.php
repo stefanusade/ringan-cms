@@ -1,6 +1,6 @@
 <?php
 /**
- * Pengaturan situs (judul, tagline, deskripsi, favicon) — superadmin only.
+ * Pengaturan situs: judul, tagline, deskripsi, favicon, zona waktu, path API.
  */
 
 declare(strict_types=1);
@@ -29,11 +29,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $form['site_title'] = sanitize_text($_POST['site_title'] ?? '');
     $form['site_tagline'] = sanitize_text($_POST['site_tagline'] ?? '');
     $form['site_description'] = sanitize_text($_POST['site_description'] ?? '');
+    $form['site_timezone'] = sanitize_text($_POST['site_timezone'] ?? 'Asia/Jakarta');
+    $form['api_path'] = strtolower(trim(sanitize_text($_POST['api_path'] ?? 'api/v1')));
     $delete_favicon = !empty($_POST['delete_favicon']);
     $has_file = !empty($_FILES['favicon']['name']);
 
     if (trim($form['site_title']) === '') {
         $errors['site_title'] = 'Judul situs wajib diisi.';
+    }
+
+    if (!in_array($form['site_timezone'], DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC), true)) {
+        $errors['site_timezone'] = 'Zona waktu tidak valid.';
+    }
+
+    if (!preg_match('#^[a-z0-9-]+(?:/[a-z0-9-]+)*$#', $form['api_path'])) {
+        $errors['api_path'] = 'Path API hanya huruf kecil, angka, dan tanda hubung, dipisah "/" (contoh: api/v1 atau content-api).';
+    } else {
+        $first = explode('/', $form['api_path'])[0];
+        if (in_array($first, ['admin', 'install', 'files', 'public'], true)) {
+            $errors['api_path'] = 'Segment pertama path API tidak boleh: admin, install, files, public.';
+        }
     }
 
     if ($has_file) {
@@ -82,6 +97,22 @@ admin_header('Pengaturan', 'settings');
     <label for="site_description">Deskripsi Situs</label>
     <textarea id="site_description" name="site_description" rows="3"><?= e($form['site_description']) ?></textarea>
     <small class="hint">Deskripsi umum; bisa dipakai frontend untuk meta description.</small>
+  </div>
+  <div class="grid-2">
+    <div class="form-group">
+      <label for="site_timezone">Zona Waktu</label>
+      <select id="site_timezone" name="site_timezone">
+        <?php foreach (timezone_options() as $tz): ?>
+          <option value="<?= e($tz) ?>"<?= $form['site_timezone'] === $tz ? ' selected' : '' ?>><?= e($tz) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="hint">Dipakai untuk tanggal/waktu di sisi aplikasi (log, nama folder upload, tampilan). Waktu saat ini: <?= e(date('Y-m-d H:i')) ?></small>
+    </div>
+    <div class="form-group">
+      <label for="api_path">Path REST API</label>
+      <input type="text" id="api_path" name="api_path" value="<?= e($form['api_path']) ?>" placeholder="api/v1">
+      <small class="hint">Prefix endpoint API — contoh: <code>content-api</code> → <code><?= e(BASE_URL . '/' . ltrim($form['api_path'], '/')) ?></code>. Mengubahnya membuat URL API lama tidak berlaku (frontend perlu diperbarui). Catatan: ini lapisan obscurity — otentikasi sesungguhnya tetap API key / JWT.</small>
+    </div>
   </div>
   <div class="form-group">
     <label for="favicon">Favicon</label>

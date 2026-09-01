@@ -16,6 +16,7 @@ require_once APP_ROOT . '/includes/response.php';
 require_once APP_ROOT . '/includes/content_types.php';
 require_once APP_ROOT . '/includes/taxonomies.php';
 require_once APP_ROOT . '/includes/audit_log.php';
+require_once APP_ROOT . '/includes/settings.php';
 require_once APP_ROOT . '/admin/partials/header.php';
 require_once APP_ROOT . '/admin/partials/footer.php';
 
@@ -110,7 +111,7 @@ admin_header('Taksonomi: ' . $ct['label'], 'content-types');
       <div class="form-group">
         <label for="tax_slug">Slug</label>
         <input type="text" id="tax_slug" name="slug" value="<?= e($form['slug']) ?>" required placeholder="contoh: category">
-        <small class="hint">Dipakai di API: /api/v1/post?tax=category&term=berita</small>
+        <small class="hint">Dipakai di API: /<?= e(get_api_path()) ?>/post?tax=category&term=berita</small>
       </div>
     </div>
     <div class="form-group">

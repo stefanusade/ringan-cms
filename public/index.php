@@ -11,8 +11,12 @@ define('APP_PUBLIC', __DIR__);
 
 require_once APP_ROOT . '/config/config.php';
 require_once APP_ROOT . '/includes/response.php';
+require_once APP_ROOT . '/includes/settings.php';
 
 send_security_headers();
+apply_site_timezone();
+
+$api_base = '/' . ltrim(get_api_path(), '/');
 
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/';
 $base_path = (string) parse_url(BASE_URL, PHP_URL_PATH);
@@ -38,13 +42,13 @@ if ($path === '/') {
     redirect(BASE_URL . '/admin');
 }
 
-/* ===== API v1 ===== */
-if ($path === '/api/v1') {
+/* ===== REST API (prefix diatur di Settings → api_path) ===== */
+if ($path === $api_base) {
     $GLOBALS['api_route_path'] = '';
     require APP_ROOT . '/api/v1/index.php';
 }
-if (str_starts_with($path, '/api/v1/')) {
-    $GLOBALS['api_route_path'] = substr($path, strlen('/api/v1'));
+if (str_starts_with($path, $api_base . '/')) {
+    $GLOBALS['api_route_path'] = substr($path, strlen($api_base));
     require APP_ROOT . '/api/v1/index.php';
 }
 

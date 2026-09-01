@@ -15,6 +15,8 @@ const SETTINGS_DEFAULTS = [
     'site_tagline' => '',
     'site_description' => '',
     'site_favicon' => '',
+    'site_timezone' => 'Asia/Jakarta',
+    'api_path' => 'api/v1',
 ];
 
 function ensure_settings_table(): void
@@ -70,4 +72,56 @@ function site_favicon_url(): string
 {
     $favicon = get_setting('site_favicon');
     return $favicon === '' ? '' : BASE_URL . '/files/' . ltrim($favicon, '/');
+}
+
+/**
+ * Terapkan zona waktu dari pengaturan situs (fallback ke .env / default).
+ */
+function apply_site_timezone(): void
+{
+    try {
+        $tz = get_setting('site_timezone', '');
+        if ($tz !== '' && in_array($tz, DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC), true)) {
+            date_default_timezone_set($tz);
+        }
+    } catch (Throwable $e) {
+        // abaikan — pakai zona waktu dari .env
+    }
+}
+
+/**
+ * Path prefix REST API dari pengaturan (default: api/v1).
+ * Selalu divalidasi ulang — jika tidak valid, fallback ke default.
+ */
+function get_api_path(): string
+{
+    try {
+        $path = strtolower(trim(get_setting('api_path', 'api/v1')));
+    } catch (Throwable $e) {
+        return 'api/v1';
+    }
+    if (!preg_match('#^[a-z0-9-]+(?:/[a-z0-9-]+)*$#', $path)) {
+        return 'api/v1';
+    }
+    return $path;
+}
+
+/**
+ * Daftar zona waktu populer untuk dropdown Settings.
+ */
+function timezone_options(): array
+{
+    static $options = null;
+    if ($options !== null) {
+        return $options;
+    }
+    $regions = ['Asia', 'Europe', 'America', 'Australia', 'Pacific', 'Africa', 'Atlantic', 'Indian'];
+    $options = ['UTC'];
+    foreach (DateTimeZone::listIdentifiers() as $tz) {
+        $region = explode('/', $tz, 2)[0];
+        if (in_array($region, $regions, true)) {
+            $options[] = $tz;
+        }
+    }
+    return $options;
 }

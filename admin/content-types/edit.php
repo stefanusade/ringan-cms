@@ -15,6 +15,7 @@ require_once APP_ROOT . '/includes/permissions.php';
 require_once APP_ROOT . '/includes/response.php';
 require_once APP_ROOT . '/includes/content_types.php';
 require_once APP_ROOT . '/includes/audit_log.php';
+require_once APP_ROOT . '/includes/settings.php';
 require_once APP_ROOT . '/admin/partials/header.php';
 require_once APP_ROOT . '/admin/partials/footer.php';
 
@@ -67,7 +68,7 @@ admin_header('Edit Content Type: ' . $ct['label'], 'content-types');
   <div class="form-group">
     <label for="slug">Slug</label>
     <input type="text" id="slug" name="slug" value="<?= e($form['slug']) ?>" required>
-    <small class="hint">Endpoint API: /api/v1/<?= e($form['slug']) ?></small>
+    <small class="hint">Endpoint API: /<?= e(get_api_path()) ?>/<?= e($form['slug']) ?></small>
   </div>
   <div class="form-group">
     <label for="description">Deskripsi (opsional)</label>

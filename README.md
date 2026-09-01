@@ -36,9 +36,10 @@ menjadi risiko Anda sendiri.
 - **API key management** — key di-hash (SHA-256) saat disimpan, key asli hanya
   tampil sekali saat dibuat. Scope `read` / `read_write`, plus restriksi per
   content type.
-- **Settings** — atur judul situs, tagline, deskripsi, dan favicon (menu
-  Settings di admin); info ini juga tersedia via endpoint publik
-  `GET /api/v1/site`.
+- **Settings** — atur judul situs, tagline, deskripsi, favicon, **zona waktu**,
+  dan **path REST API** (menu Settings di admin; default `/api/v1`, bisa diubah
+  menjadi prefix rahasia seperti `/content-api`). Info situs juga tersedia via
+  endpoint publik `GET /api/v1/site`.
 - **Taksonomi** — kategori/tag/kustom per content type (hierarkis opsional);
   term dikelola di admin, entri bisa multi-term. API: filter
   `?tax=<slug>&term=<slug>`, daftar `GET /api/v1/{slug}/taxonomies`, dan
@@ -141,6 +142,10 @@ storage/      uploads/ (di luar webroot) + logs/
 ```
 
 ## API
+
+Default prefix: `/api/v1` — bisa diubah di admin (Settings → Path REST API),
+misal menjadi `/content-api`. Catatan: mengubah path adalah lapisan obscurity
+saja; otentikasi sesungguhnya tetap API key / JWT.
 
 Auth: header `X-API-Key: <key>` (atau `Authorization: Bearer <jwt>`).
 

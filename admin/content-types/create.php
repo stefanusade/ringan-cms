@@ -15,6 +15,7 @@ require_once APP_ROOT . '/includes/permissions.php';
 require_once APP_ROOT . '/includes/response.php';
 require_once APP_ROOT . '/includes/content_types.php';
 require_once APP_ROOT . '/includes/audit_log.php';
+require_once APP_ROOT . '/includes/settings.php';
 require_once APP_ROOT . '/admin/partials/header.php';
 require_once APP_ROOT . '/admin/partials/footer.php';
 
@@ -60,7 +61,7 @@ admin_header('Buat Content Type', 'content-types');
   <div class="form-group">
     <label for="slug">Slug</label>
     <input type="text" id="slug" name="slug" value="<?= e($form['slug']) ?>" required placeholder="contoh: artikel-berita">
-    <small class="hint">Digunakan sebagai endpoint API: /api/v1/artikel-berita</small>
+    <small class="hint">Digunakan sebagai endpoint API: /<?= e(get_api_path()) ?>/artikel-berita</small>
   </div>
   <div class="form-group">
     <label for="description">Deskripsi (opsional)</label>
