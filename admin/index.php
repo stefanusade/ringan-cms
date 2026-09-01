@@ -14,6 +14,8 @@ require_once APP_ROOT . '/includes/auth.php';
 require_once APP_ROOT . '/includes/permissions.php';
 require_once APP_ROOT . '/includes/response.php';
 require_once APP_ROOT . '/includes/content_types.php';
+require_once APP_ROOT . '/includes/settings.php';
+require_once APP_ROOT . '/includes/updater.php';
 require_once APP_ROOT . '/includes/content_entries.php';
 require_once APP_ROOT . '/includes/render.php';
 require_once APP_ROOT . '/admin/partials/header.php';
@@ -40,6 +42,16 @@ $recent = $db->query(
 
 admin_header('Dashboard', 'dashboard');
 ?>
+<?php if (is_superadmin($user)): ?>
+  <?php $update = is_update_available(); ?>
+  <?php if ($update !== null): ?>
+    <div class="alert alert-info">
+      Versi <strong><?= e($update['version']) ?></strong> tersedia. <a href="<?= e(admin_url('updates')) ?>">Update sekarang →</a>
+    </div>
+  <?php elseif (update_url_setting() === ''): ?>
+    <p class="muted" style="font-size:.85rem">Pemeriksaan pembaruan nonaktif — atur <em>Update URL</em> di <a href="<?= e(admin_url('settings')) ?>">Settings</a>.</p>
+  <?php endif; ?>
+<?php endif; ?>
 <div class="stats-grid">
   <div class="stat"><div class="stat-value"><?= (int) $stats['content_types'] ?></div><div class="stat-label">Content Types</div></div>
   <div class="stat"><div class="stat-value"><?= (int) $stats['entries'] ?></div><div class="stat-label">Total Entries</div></div>

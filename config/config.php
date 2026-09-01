@@ -74,6 +74,9 @@ define('APP_DEBUG', env('APP_DEBUG', 'false') === 'true');
 define('APP_TIMEZONE', env('APP_TIMEZONE', 'Asia/Jakarta'));
 date_default_timezone_set(APP_TIMEZONE);
 
+/* ===== Versi aplikasi ===== */
+define('RINGAN_CMS_VERSION', '1.1.0');
+
 /* ===== Database ===== */
 define('DB_HOST', env('DB_HOST', '127.0.0.1'));
 define('DB_PORT', env('DB_PORT', '3306'));

@@ -82,6 +82,7 @@ $admin_routes = [
     '/admin/api-keys/create' => 'admin/api-keys/create.php',
     '/admin/api-keys/revoke' => 'admin/api-keys/revoke.php',
     '/admin/settings' => 'admin/settings/index.php',
+    '/admin/updates' => 'admin/updates/index.php',
 ];
 
 if (isset($admin_routes[$path])) {

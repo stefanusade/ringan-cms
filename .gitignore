@@ -2,6 +2,8 @@
 /vendor/
 /storage/uploads/*
 /storage/logs/*
+/storage/tmp/
+/storage/backups/
 !/storage/uploads/.htaccess
 !/storage/uploads/index.html
 !/storage/logs/.htaccess

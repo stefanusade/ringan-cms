@@ -17,6 +17,7 @@ const SETTINGS_DEFAULTS = [
     'site_favicon' => '',
     'site_timezone' => 'Asia/Jakarta',
     'api_path' => 'api/v1',
+    'update_url' => '',
 ];
 
 function ensure_settings_table(): void

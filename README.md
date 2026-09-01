@@ -44,6 +44,8 @@ menjadi risiko Anda sendiri.
   term dikelola di admin, entri bisa multi-term. API: filter
   `?tax=<slug>&term=<slug>`, daftar `GET /api/v1/{slug}/taxonomies`, dan
   term ikut di payload setiap entri.
+- **Update** — cek & update Ringan CMS langsung dari dashboard (manifest
+  JSON yang di-host sendiri, superadmin only, backup otomatis).
 - **Login API (JWT)** opsional via `POST /api/v1/auth`.
 - **Pagination wajib** pada list endpoint (maks `per_page=100`).
 
@@ -234,6 +236,19 @@ curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts?tax=category&
 | Kelola content types    | ✓          | —      | —      |
 | Buat/edit/hapus entri   | ✓          | ✓      | —      |
 | Lihat entri/dashboard   | ✓          | ✓      | ✓      |
+
+## Pembaruan
+
+- Menu **Updates** di dashboard menampilkan versi terbaru (cache 6 jam) dan
+  tombol update interaktif.
+- Aktifkan dengan mengisi **Update URL** di Settings — URL manifest JSON:
+  `{ "version": "1.2.0", "url": "https://…/ringan-cms-1.2.0.zip", "checksum": "sha256-hex", "changelog": "…" }`.
+- Proses update: backup otomatis (storage/backups) → unduh paket → verifikasi
+  checksum SHA-256 → ekstrak aman (anti zip-slip) → salin file (`.env`,
+  `storage/`, `.git` tidak tersentuh) → jalankan semua migrasi DB → bersihkan
+  cache.
+- Butuh ekstensi PHP **ZipArchive** (ext-zip) dan hak tulis web server pada
+  direktori project.
 
 ## Pengembangan
 

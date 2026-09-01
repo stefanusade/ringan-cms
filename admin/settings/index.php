@@ -31,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $form['site_description'] = sanitize_text($_POST['site_description'] ?? '');
     $form['site_timezone'] = sanitize_text($_POST['site_timezone'] ?? 'Asia/Jakarta');
     $form['api_path'] = strtolower(trim(sanitize_text($_POST['api_path'] ?? 'api/v1')));
+    $form['update_url'] = trim(sanitize_text($_POST['update_url'] ?? ''));
     $delete_favicon = !empty($_POST['delete_favicon']);
     $has_file = !empty($_FILES['favicon']['name']);
 
@@ -49,6 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (in_array($first, ['admin', 'install', 'files', 'public'], true)) {
             $errors['api_path'] = 'Segment pertama path API tidak boleh: admin, install, files, public.';
         }
+    }
+
+    if ($form['update_url'] !== '' && !filter_var($form['update_url'], FILTER_VALIDATE_URL)) {
+        $errors['update_url'] = 'URL manifest pembaruan tidak valid (harus http/https).';
     }
 
     if ($has_file) {
@@ -113,6 +118,11 @@ admin_header('Pengaturan', 'settings');
       <input type="text" id="api_path" name="api_path" value="<?= e($form['api_path']) ?>" placeholder="api/v1">
       <small class="hint">Prefix endpoint API — contoh: <code>content-api</code> → <code><?= e(BASE_URL . '/' . ltrim($form['api_path'], '/')) ?></code>. Mengubahnya membuat URL API lama tidak berlaku (frontend perlu diperbarui). Catatan: ini lapisan obscurity — otentikasi sesungguhnya tetap API key / JWT.</small>
     </div>
+  </div>
+  <div class="form-group">
+    <label for="update_url">Update URL (manifest pembaruan)</label>
+    <input type="url" id="update_url" name="update_url" value="<?= e($form['update_url']) ?>" placeholder="https://contoh.com/ringan-cms-manifest.json">
+    <small class="hint">JSON: <code>{ "version": "1.2.0", "url": "https://…/paket.zip", "checksum": "sha256-hex", "changelog": "…" }</code>. Kosongkan untuk menonaktifkan pemeriksaan update.</small>
   </div>
   <div class="form-group">
     <label for="favicon">Favicon</label>
