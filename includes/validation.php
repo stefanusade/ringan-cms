@@ -136,7 +136,7 @@ function normalize_date(mixed $value): ?string
  * Mengembalikan nilai yang sudah dibersihkan; jika gagal, push error ke $errors
  * dan mengembalikan null.
  */
-function validate_field_value(array $field_def, mixed $raw, array &$errors): mixed
+function validate_field_value(array $field_def, mixed $raw, array &$errors, bool $check_required = true): mixed
 {
     $required = (bool) ($field_def['is_required'] ?? 0);
     $type = $field_def['field_type'] ?? 'text';
@@ -148,7 +148,7 @@ function validate_field_value(array $field_def, mixed $raw, array &$errors): mix
         || (is_array($raw) && count($raw) === 0);
 
     if ($empty) {
-        if ($required) {
+        if ($required && $check_required) {
             $errors[] = sprintf('Field "%s" wajib diisi.', $label);
         }
         return null;

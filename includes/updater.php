@@ -11,6 +11,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/settings.php';
+require_once __DIR__ . '/validation.php';
 
 const UPDATE_CACHE_TTL = 21600; // 6 jam
 
@@ -27,6 +28,7 @@ function update_url_setting(): string
 function clear_update_cache(): void
 {
     set_setting('update_cache', '');
+    set_setting('update_history_cache', '');
     set_setting('update_cache_at', '');
 }
 
@@ -444,4 +446,184 @@ function do_update(): array
             rmdir($run);
         }
     }
+}
+
+/* ===== Riwayat rilis (What's New) ===== */
+
+/**
+ * URL daftar rilis GitHub bila update_url menunjuk ke .../releases/latest.
+ * Manifest kustom tidak punya riwayat → null.
+ */
+function update_history_url(): ?string
+{
+    $source = update_url_setting();
+    if ($source === '') {
+        return null;
+    }
+    if (preg_match('#^https://api\.github\.com/repos/([^/]+/[^/]+)/releases/latest$#i', $source, $m)) {
+        return 'https://api.github.com/repos/' . $m[1] . '/releases?per_page=10';
+    }
+    return null;
+}
+
+function parse_update_history(string $json): array
+{
+    $data = json_decode($json, true);
+    if (!is_array($data)) {
+        return [];
+    }
+    $out = [];
+    foreach ($data as $rel) {
+        if (!is_array($rel) || !empty($rel['draft'])) {
+            continue;
+        }
+        $version = ltrim((string) ($rel['tag_name'] ?? ''), 'v');
+        if ($version === '') {
+            continue;
+        }
+        $out[] = [
+            'version' => $version,
+            'name' => (string) ($rel['name'] ?? ''),
+            'date' => (string) ($rel['published_at'] ?? ''),
+            'body' => (string) ($rel['body'] ?? ''),
+            'prerelease' => !empty($rel['prerelease']),
+        ];
+    }
+    return $out;
+}
+
+/**
+ * Ambil daftar rilis (cache 6 jam di tabel settings).
+ */
+function get_update_history(bool $force = false): array
+{
+    $url = update_history_url();
+    if ($url === null) {
+        return [];
+    }
+    if (!$force) {
+        $at = (int) get_setting('update_cache_at', '0');
+        if (time() - $at < UPDATE_CACHE_TTL) {
+            $cached = get_setting('update_history_cache', '');
+            if ($cached !== '') {
+                $parsed = parse_update_history($cached);
+                if ($parsed !== []) {
+                    return $parsed;
+                }
+            }
+        }
+    }
+    $body = http_get($url);
+    if ($body === null || $body === '') {
+        return [];
+    }
+    $parsed = parse_update_history($body);
+    if ($parsed !== []) {
+        set_setting('update_history_cache', $body);
+        set_setting('update_cache_at', (string) time());
+    }
+    return $parsed;
+}
+
+/* ===== Render markdown-lite yang aman untuk changelog ===== */
+
+function changelog_inline(string $text): string
+{
+    $text = preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', function ($m) {
+        if (preg_match('#^(javascript|vbscript|data):#i', $m[2])) {
+            return e($m[0]);
+        }
+        return '<a href="' . e($m[2]) . '" target="_blank" rel="noopener">' . e($m[1]) . '</a>';
+    }, $text);
+    $text = preg_replace_callback('/`([^`]+)`/', function ($m) {
+        return '<code>' . e($m[1]) . '</code>';
+    }, $text);
+    $text = preg_replace_callback('/\*\*([^*]+)\*\*/', function ($m) {
+        return '<strong>' . e($m[1]) . '</strong>';
+    }, $text);
+    return $text;
+}
+
+function render_changelog_markdown(string $markdown): string
+{
+    $lines = preg_split('/\r\n|\r|\n/', $markdown);
+    $html = '';
+    $in_list = false;
+    $in_code = false;
+    $code_lines = [];
+    $paragraph = [];
+
+    $flush_paragraph = function () use (&$html, &$paragraph) {
+        if ($paragraph === []) {
+            return;
+        }
+        $html .= '<p>' . changelog_inline(implode(' ', $paragraph)) . '</p>';
+        $paragraph = [];
+    };
+    $close_list = function () use (&$html, &$in_list) {
+        if ($in_list) {
+            $html .= '</ul>';
+            $in_list = false;
+        }
+    };
+    $flush_code = function () use (&$html, &$in_code, &$code_lines) {
+        if (!$in_code) {
+            return;
+        }
+        $html .= '<pre><code>' . e(implode("\n", $code_lines)) . '</code></pre>';
+        $code_lines = [];
+        $in_code = false;
+    };
+
+    foreach ($lines as $raw) {
+        $line = rtrim($raw);
+
+        if (preg_match('/^```/', $line)) {
+            $flush_paragraph();
+            $close_list();
+            if ($in_code) {
+                $flush_code();
+            } else {
+                $in_code = true;
+                $code_lines = [];
+            }
+            continue;
+        }
+        if ($in_code) {
+            $code_lines[] = $line;
+            continue;
+        }
+        if (trim($line) === '') {
+            $flush_paragraph();
+            $close_list();
+            continue;
+        }
+        if (preg_match('/^(#{1,4})\s+(.*)$/', $line, $m)) {
+            $flush_paragraph();
+            $close_list();
+            $level = min(6, strlen($m[1]) + 2);
+            $html .= '<h' . $level . '>' . changelog_inline($m[2]) . '</h' . $level . '>';
+            continue;
+        }
+        if (preg_match('/^-{3,}$/', trim($line))) {
+            $flush_paragraph();
+            $close_list();
+            $html .= '<hr>';
+            continue;
+        }
+        if (preg_match('/^[-*]\s+(.*)$/', $line, $m)) {
+            $flush_paragraph();
+            if (!$in_list) {
+                $html .= '<ul>';
+                $in_list = true;
+            }
+            $html .= '<li>' . changelog_inline($m[1]) . '</li>';
+            continue;
+        }
+        $paragraph[] = changelog_inline($line);
+    }
+    $flush_paragraph();
+    $close_list();
+    $flush_code();
+    return $html;
 }

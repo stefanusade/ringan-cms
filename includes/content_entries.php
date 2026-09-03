@@ -131,7 +131,7 @@ function decode_entry_data(array $entry): array
  *
  * @return array{ok:bool,data:array,errors:array<string,string[]>}
  */
-function validate_entry_payload(array $payload, array $fields, bool $partial = false): array
+function validate_entry_payload(array $payload, array $fields, bool $partial = false, bool $enforce_required = true): array
 {
     $errors = [];
     $field_map = [];
@@ -155,7 +155,7 @@ function validate_entry_payload(array $payload, array $fields, bool $partial = f
         }
         $raw = $has ? $payload[$key] : null;
         $field_errors = [];
-        $value = validate_field_value($field, $raw, $field_errors);
+        $value = validate_field_value($field, $raw, $field_errors, $enforce_required);
 
         // validasi relasi: target harus eksis
         if (($field['field_type'] ?? '') === 'relation' && $value !== null) {
@@ -183,4 +183,23 @@ function validate_entry_payload(array $payload, array $fields, bool $partial = f
     }
 
     return ['ok' => $errors === [], 'data' => $clean, 'errors' => $errors];
+}
+
+/**
+ * Daftar field required yang nilainya kosong — dipakai untuk memblokir
+ * status non-draft (published/archived) bila ada field wajib belum diisi.
+ */
+function entry_missing_required_fields(array $data, array $fields): array
+{
+    $missing = [];
+    foreach ($fields as $field) {
+        if (empty($field['is_required'])) {
+            continue;
+        }
+        $key = $field['field_key'];
+        if (!validate_required($data[$key] ?? null)) {
+            $missing[] = sprintf('Field "%s" wajib diisi untuk status ini.', $field['label'] ?? $key);
+        }
+    }
+    return $missing;
 }

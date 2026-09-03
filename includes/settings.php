@@ -20,6 +20,18 @@ const SETTINGS_DEFAULTS = [
     // Default: GitHub Releases project ini. Bisa diganti manifest kustom atau
     // dikosongkan untuk menonaktifkan. Repo harus publik & release punya .zip.
     'update_url' => 'https://api.github.com/repos/stefanusade/ringan-cms/releases/latest',
+    // Media: kompresi gambar & offload S3/R2.
+    'media_compress' => '1',
+    'media_max_width' => '1920',
+    'media_quality' => '82',
+    'media_offload' => '0',
+    'media_endpoint' => '',
+    'media_region' => 'auto',
+    'media_bucket' => '',
+    'media_access_key' => '',
+    'media_secret_key' => '',
+    'media_keep_local' => '1',
+    'media_public_base' => '',
 ];
 
 function ensure_settings_table(): void
@@ -127,4 +139,33 @@ function timezone_options(): array
         }
     }
     return $options;
+}
+
+/* ===== Konfigurasi media (kompresi & offload) =====
+ * Prioritas nilai: env (MEDIA_*) > setting DB (media_*).
+ * Env lebih aman untuk secret (access/secret key). */
+
+function media_config(string $key, string $default = ''): string
+{
+    $env_name = 'MEDIA_' . strtoupper($key);
+    $env = getenv($env_name);
+    if ($env !== false) {
+        return (string) $env;
+    }
+    return get_setting('media_' . $key, $default);
+}
+
+function media_offload_active(): bool
+{
+    return in_array(media_config('offload', '0'), ['1', 'true'], true);
+}
+
+function media_keep_local(): bool
+{
+    return !in_array(media_config('keep_local', '1'), ['0', 'false'], true);
+}
+
+function media_compress_enabled(): bool
+{
+    return in_array(media_config('compress', '1'), ['1', 'true'], true);
 }

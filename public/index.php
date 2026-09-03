@@ -82,6 +82,7 @@ $admin_routes = [
     '/admin/api-keys/create' => 'admin/api-keys/create.php',
     '/admin/api-keys/revoke' => 'admin/api-keys/revoke.php',
     '/admin/settings' => 'admin/settings/index.php',
+    '/admin/settings/media' => 'admin/settings/media.php',
     '/admin/updates' => 'admin/updates/index.php',
 ];
 
@@ -156,7 +157,15 @@ function serve_upload_file(string $relative): void
     }
     $base = realpath(UPLOAD_DIR);
     $file = realpath(UPLOAD_DIR . '/' . $relative);
-    if ($base === false || $file === false || !str_starts_with($file, $base . DIRECTORY_SEPARATOR) || !is_file($file)) {
+    $local_ok = $base !== false && $file !== false
+        && str_starts_with($file, $base . DIRECTORY_SEPARATOR)
+        && is_file($file);
+    if (!$local_ok) {
+        // File lokal tidak ada — alihkan ke URL publik bila offload aktif.
+        $public_base = trim((string) media_config('public_base', ''));
+        if (media_offload_active() && $public_base !== '') {
+            redirect(rtrim($public_base, '/') . '/' . ltrim($relative, '/'));
+        }
         http_response_code(404);
         exit;
     }

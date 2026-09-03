@@ -42,7 +42,7 @@ function admin_icon(string $name): string
 /**
  * Bangun menu sidebar; setiap content type (CPT) tampil sebagai submenu Entries.
  */
-function admin_menu_items(array $user): array
+function admin_menu_items(array $user, string $active = ''): array
 {
     $ct_active = (int) ($_GET['content_type'] ?? 0);
     $entries_children = [];
@@ -65,7 +65,16 @@ function admin_menu_items(array $user): array
     if (is_superadmin($user)) {
         $items[] = ['key' => 'users', 'label' => 'Users', 'icon' => 'users', 'url' => admin_url('users')];
         $items[] = ['key' => 'api-keys', 'label' => 'API Keys', 'icon' => 'api-keys', 'url' => admin_url('api-keys')];
-        $items[] = ['key' => 'settings', 'label' => 'Settings', 'icon' => 'settings', 'url' => admin_url('settings')];
+        $items[] = [
+            'key' => 'settings',
+            'label' => 'Settings',
+            'icon' => 'settings',
+            'url' => admin_url('settings'),
+            'children' => [
+                ['label' => 'General', 'url' => admin_url('settings'), 'active' => $active === 'settings'],
+                ['label' => 'Media', 'url' => admin_url('settings/media'), 'active' => $active === 'settings-media'],
+            ],
+        ];
         $items[] = ['key' => 'updates', 'label' => 'Updates', 'icon' => 'updates', 'url' => admin_url('updates')];
     }
     return $items;
@@ -74,7 +83,7 @@ function admin_menu_items(array $user): array
 function admin_header(string $title, string $active = ''): void
 {
     $user = current_user();
-    $items = admin_menu_items($user);
+    $items = admin_menu_items($user, $active);
     ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -100,12 +109,28 @@ function admin_header(string $title, string $active = ''): void
     <nav class="sidebar-nav">
       <ul class="menu">
         <?php foreach ($items as $item): ?>
-          <?php $has_children = !empty($item['children']); ?>
-          <li class="menu-item<?= $item['key'] === $active ? ' active' : '' ?><?= $has_children ? ' has-children' : '' ?>">
-            <a class="menu-link" href="<?= e($item['url']) ?>" title="<?= e($item['label']) ?>">
-              <?= admin_icon($item['icon']) ?>
-              <span><?= e($item['label']) ?></span>
-            </a>
+          <?php
+          $has_children = !empty($item['children']);
+          $item_active = $item['key'] === $active;
+          if (!$item_active && $has_children) {
+              foreach ($item['children'] as $child) {
+                  if (!empty($child['active'])) {
+                      $item_active = true;
+                      break;
+                  }
+              }
+          }
+          ?>
+          <li class="menu-item<?= $item_active ? ' active' : '' ?><?= $has_children ? ' has-children' : '' ?>" data-menu-key="<?= e($item['key']) ?>">
+            <div class="menu-row">
+              <a class="menu-link" href="<?= e($item['url']) ?>" title="<?= e($item['label']) ?>">
+                <?= admin_icon($item['icon']) ?>
+                <span><?= e($item['label']) ?></span>
+              </a>
+              <?php if ($has_children): ?>
+                <button type="button" class="menu-toggle" aria-expanded="true" aria-label="Perluas / tutup <?= e($item['label']) ?>">▾</button>
+              <?php endif; ?>
+            </div>
             <?php if ($has_children): ?>
               <ul class="submenu">
                 <?php if ($item['children'] === []): ?>

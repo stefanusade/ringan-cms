@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $form_data[$key] = $payload[$key] ?? null;
     }
 
-    $result = validate_entry_payload($payload, $fields, false);
+    $result = validate_entry_payload($payload, $fields, false, $form_status !== 'draft');
     $errors = $result['errors'];
     foreach ($upload_errors as $k => $msgs) {
         $errors[$k] = array_merge($errors[$k] ?? [], $msgs);
@@ -169,6 +169,7 @@ admin_header('Tambah Entri: ' . $ct['label'], 'entries');
         <option value="<?= e($s) ?>"<?= $form_status === $s ? ' selected' : '' ?>><?= e($s) ?></option>
       <?php endforeach; ?>
     </select>
+    <small class="hint">Field bertanda * (wajib) hanya dicek saat status bukan <em>draft</em> — entri draft bisa disimpan meski field wajib kosong.</small>
   </div>
   <button type="submit" class="btn btn-primary">Simpan Entri</button>
   <a class="btn" href="<?= e(admin_url('entries?content_type=' . $ct_id)) ?>">Batal</a>

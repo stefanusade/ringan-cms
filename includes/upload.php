@@ -6,7 +6,10 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/validation.php';
+require_once __DIR__ . '/settings.php';
+require_once __DIR__ . '/s3.php';
 
 const UPLOAD_MIME_MAP = [
     'image/jpeg' => 'jpg',
@@ -77,11 +80,18 @@ function handle_upload(array $file, bool $image_only = false): array
     if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
         return ['ok' => false, 'error' => 'Gagal membuat direktori penyimpanan.'];
     }
-    if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $name)) {
+    $full_path = $dir . '/' . $name;
+    if (!move_uploaded_file($file['tmp_name'], $full_path)) {
         return ['ok' => false, 'error' => 'Gagal menyimpan file.'];
     }
-    @chmod($dir . '/' . $name, 0640);
-    return ['ok' => true, 'path' => $subdir . '/' . $name, 'mime' => $mime];
+    @chmod($full_path, 0640);
+    $relative = $subdir . '/' . $name;
+    $finalize = finalize_uploaded_media($full_path, $relative, $mime, $image_only);
+    if (!$finalize['ok']) {
+        @unlink($full_path);
+        return ['ok' => false, 'error' => $finalize['error']];
+    }
+    return ['ok' => true, 'path' => $relative, 'mime' => $mime];
 }
 
 /**
@@ -124,9 +134,16 @@ function save_base64_upload(string $data_uri, bool $image_only = false): array
     if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
         return ['ok' => false, 'error' => 'Gagal membuat direktori penyimpanan.'];
     }
-    file_put_contents($dir . '/' . $name, $binary);
-    @chmod($dir . '/' . $name, 0640);
-    return ['ok' => true, 'path' => $subdir . '/' . $name];
+    $full_path = $dir . '/' . $name;
+    file_put_contents($full_path, $binary);
+    @chmod($full_path, 0640);
+    $relative = $subdir . '/' . $name;
+    $finalize = finalize_uploaded_media($full_path, $relative, $real_mime, $image_only);
+    if (!$finalize['ok']) {
+        @unlink($full_path);
+        return ['ok' => false, 'error' => $finalize['error']];
+    }
+    return ['ok' => true, 'path' => $relative];
 }
 
 /**
@@ -144,8 +161,105 @@ function valid_upload_path(string $relative_path): bool
 
 function delete_upload(string $relative_path): void
 {
-    if ($relative_path === '' || !valid_upload_path($relative_path)) {
+    if ($relative_path === '') {
         return;
     }
-    @unlink(UPLOAD_DIR . '/' . $relative_path);
+    if (valid_upload_path($relative_path)) {
+        @unlink(UPLOAD_DIR . '/' . $relative_path);
+    }
+    // Hapus juga objek jarak jauh bila offload aktif (best-effort).
+    try {
+        if (media_offload_active()) {
+            s3_delete_object($relative_path);
+        }
+    } catch (Throwable $e) {
+        // abaikan — penghapusan jarak jauh tidak boleh menggagalkan request
+    }
+}
+
+/* ===== Media: kompresi gambar (GD) & finalisasi upload ===== */
+
+/**
+ * Kompres/resize gambar JPEG/PNG/WebP memakai GD. ICO & GIF dibiarkan.
+ */
+function compress_image_file(string $full_path, string $mime): void
+{
+    if (!function_exists('imagecreatetruecolor')) {
+        return;
+    }
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+        return;
+    }
+    switch ($mime) {
+        case 'image/jpeg':
+            $src = @imagecreatefromjpeg($full_path);
+            break;
+        case 'image/png':
+            $src = @imagecreatefrompng($full_path);
+            break;
+        case 'image/webp':
+            $src = @imagecreatefromwebp($full_path);
+            break;
+        default:
+            return;
+    }
+    if ($src === false) {
+        return;
+    }
+    $max_width = max(100, (int) media_config('max_width', '1920'));
+    $quality = max(10, min(100, (int) media_config('quality', '82')));
+    $w = imagesx($src);
+    $h = imagesy($src);
+    $resized = false;
+    if ($w > $max_width) {
+        $nw = $max_width;
+        $nh = (int) max(1, round($h * $max_width / $w));
+        $dst = imagecreatetruecolor($nw, $nh);
+        if ($dst !== false) {
+            if ($mime === 'image/png' || $mime === 'image/webp') {
+                imagealphablending($dst, false);
+                imagesavealpha($dst, true);
+            }
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            imagedestroy($src);
+            $src = $dst;
+            $resized = true;
+        }
+    }
+    switch ($mime) {
+        case 'image/jpeg':
+            imagejpeg($src, $full_path, $quality);
+            break;
+        case 'image/webp':
+            imagewebp($src, $full_path, $quality);
+            break;
+        case 'image/png':
+            // PNG lossless: tulis ulang hanya bila di-resize
+            if ($resized) {
+                imagepng($src, $full_path, 9);
+            }
+            break;
+    }
+    imagedestroy($src);
+}
+
+/**
+ * Pasca-proses media tersimpan: kompresi (gambar) + offload S3/R2 bila aktif.
+ * @return array{ok:bool,error?:string}
+ */
+function finalize_uploaded_media(string $full_path, string $relative_path, string $mime, bool $is_image): array
+{
+    if ($is_image && media_compress_enabled()) {
+        compress_image_file($full_path, $mime);
+    }
+    if (media_offload_active()) {
+        $res = s3_put_object($relative_path, $full_path, $mime);
+        if (!$res['ok']) {
+            return ['ok' => false, 'error' => 'Offload media gagal: ' . ($res['error'] ?? 'kesalahan tidak diketahui')];
+        }
+        if (!media_keep_local()) {
+            @unlink($full_path);
+        }
+    }
+    return ['ok' => true];
 }

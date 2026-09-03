@@ -101,6 +101,42 @@
         });
       }
 
+      // ===== Submenu expand/collapse =====
+      var menuStateKey = 'rcm_menu_state';
+      var menuState = {};
+      try { menuState = JSON.parse(localStorage.getItem(menuStateKey) || '{}'); } catch (e) {}
+      var saveMenuState = function () {
+        try { localStorage.setItem(menuStateKey, JSON.stringify(menuState)); } catch (e) {}
+      };
+
+      document.querySelectorAll('.menu-item.has-children').forEach(function (li) {
+        var key = li.dataset.menuKey || '';
+        var isCurrent = li.classList.contains('active') || !!li.querySelector('.submenu-item.active');
+        var toggle = li.querySelector('.menu-toggle');
+
+        var collapsed;
+        if (isCurrent) {
+          collapsed = false;
+        } else if (menuState[key] === '1') {
+          collapsed = true;
+        } else if (menuState[key] === '0') {
+          collapsed = false;
+        } else {
+          collapsed = true; // default: bagian non-aktif tertutup
+        }
+        li.classList.toggle('collapsed', collapsed);
+        if (toggle) {
+          toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+          toggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var isCollapsed = li.classList.toggle('collapsed');
+            menuState[key] = isCollapsed ? '1' : '0';
+            saveMenuState();
+            toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+          });
+        }
+      });
     }
   });
 })();

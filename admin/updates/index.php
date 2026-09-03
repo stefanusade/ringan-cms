@@ -23,6 +23,7 @@ $user = require_role('superadmin');
 
 $result = null;
 $manifest = is_update_available();
+$history = get_update_history();
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     require_csrf();
@@ -34,6 +35,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     } elseif ($action === 'check_now') {
         clear_update_cache();
         $manifest = is_update_available(true);
+        $history = get_update_history(true);
         flash_set('info', 'Pemeriksaan pembaruan selesai.');
     }
 }
@@ -88,6 +90,34 @@ admin_header('Pembaruan', 'updates');
     <input type="hidden" name="action" value="check_now">
     <button type="submit" class="btn">Periksa Ulang Sekarang</button>
   </form>
+</div>
+
+<div class="card">
+  <h2 class="section-title">What's New / Changelog</h2>
+  <?php if ($history !== []): ?>
+    <?php foreach ($history as $entry): ?>
+      <?php $entry_new = version_compare($entry['version'], cms_version(), '>'); ?>
+      <div class="changelog-entry<?= $entry_new ? ' is-new' : '' ?>">
+        <div class="changelog-head">
+          <strong>v<?= e($entry['version']) ?></strong>
+          <?php if ($entry_new): ?>
+            <span class="badge">Baru</span>
+          <?php endif; ?>
+          <?php if ($entry['prerelease']): ?>
+            <span class="badge">prerelease</span>
+          <?php endif; ?>
+          <span class="muted">— <?= e(substr($entry['date'], 0, 10)) ?></span>
+        </div>
+        <?php if ($entry['body'] !== ''): ?>
+          <div class="changelog-body"><?= render_changelog_markdown($entry['body']) ?></div>
+        <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
+  <?php elseif ($manifest !== null && $manifest['changelog'] !== ''): ?>
+    <div class="changelog-body"><?= nl2br(e($manifest['changelog'])) ?></div>
+  <?php else: ?>
+    <p class="muted">Riwayat rilis tidak tersedia (update nonaktif atau manifest kustom tanpa changelog).</p>
+  <?php endif; ?>
 </div>
 <?php
 admin_footer();

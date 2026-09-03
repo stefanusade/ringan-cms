@@ -417,6 +417,7 @@ a:hover { text-decoration: underline; }
     gap: 0;
   }
   body.sidebar-hidden .menu-link span { display: none; }
+  body.sidebar-hidden .menu-toggle { display: none; }
 
   body.sidebar-hidden .submenu { display: none; }
 
@@ -453,3 +454,59 @@ a:hover { text-decoration: underline; }
 .gallery-item { width: 110px; }
 .gallery-item img { width: 110px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; }
 .gallery-item .keep-file { display: block; font-size: 0.75rem; margin-top: 2px; }
+
+/* ===== Submenu expand/collapse ===== */
+.menu-item { position: relative; }
+.menu-item.has-children > .menu-link { padding-right: 34px; }
+.menu-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%) rotate(0deg);
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 6px 7px;
+  border-radius: 4px;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.menu-toggle:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+.menu-item.active > .menu-link + .menu-toggle { color: #fff; }
+.menu-item.collapsed > .menu-toggle { transform: translateY(-50%) rotate(-90deg); }
+.menu-item.collapsed > .submenu { display: none; }
+
+/* ===== Perbaikan: toggle submenu tetap di samping label parent ===== */
+.menu-row { display: flex; align-items: center; }
+.menu-row > .menu-link { flex: 1; min-width: 0; border-radius: 4px; }
+
+.menu-item > .menu-row > .menu-toggle {
+  position: static;
+  top: auto;
+  right: auto;
+  transform: none;
+  margin-right: 2px;
+  padding: 8px 9px;
+}
+.menu-item.collapsed > .menu-row > .menu-toggle { transform: rotate(-90deg); }
+
+.menu-item.active > .menu-row > .menu-link { background: #2271b1; color: #fff; }
+.menu-item.active > .menu-row > .menu-toggle { color: #fff; }
+.menu-row:hover > .menu-link { background: #2c3338; color: #fff; }
+.menu-item.active > .menu-row:hover > .menu-link { background: #2271b1; }
+
+/* ===== What's New / Changelog (halaman Updates) ===== */
+.changelog-entry { border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin-bottom: 12px; }
+.changelog-entry.is-new { border-left: 4px solid var(--primary); }
+.changelog-head { margin-bottom: 6px; }
+.changelog-head .badge { margin-left: 6px; }
+.changelog-body { font-size: 0.9rem; line-height: 1.6; }
+.changelog-body h3, .changelog-body h4, .changelog-body h5 { margin: 10px 0 4px; }
+.changelog-body p { margin: 4px 0; }
+.changelog-body ul { list-style: disc; padding-left: 20px; margin: 4px 0; }
+.changelog-body code { background: #f3f4f6; border-radius: 3px; padding: 0 4px; font-size: 0.85em; }
+.changelog-body pre { background: #f3f4f6; padding: 8px; border-radius: 4px; overflow-x: auto; }
+.changelog-body pre code { background: none; padding: 0; }
+.changelog-body hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }

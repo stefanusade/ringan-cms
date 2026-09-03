@@ -73,9 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $form['site_favicon'] = '';
     }
 
+    // Hanya simpan key milik halaman ini (jangan menimpa key Media).
+    $general_keys = ['site_title', 'site_tagline', 'site_description', 'site_favicon', 'site_timezone', 'api_path', 'update_url'];
     if ($errors === []) {
-        foreach ($form as $key => $value) {
-            set_setting($key, (string) $value);
+        foreach ($general_keys as $key) {
+            if (array_key_exists($key, $form)) {
+                set_setting($key, (string) $form[$key]);
+            }
         }
         log_audit('update_settings', 'settings', null, (int) $user['id']);
         flash_set('success', 'Pengaturan situs disimpan.');
@@ -83,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-admin_header('Pengaturan', 'settings');
+admin_header('Pengaturan Umum', 'settings');
 ?>
 <form method="post" action="<?= e(admin_url('settings')) ?>" enctype="multipart/form-data" class="card">
   <?= csrf_field() ?>

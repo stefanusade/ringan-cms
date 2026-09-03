@@ -46,6 +46,8 @@ menjadi risiko Anda sendiri.
   term ikut di payload setiap entri.
 - **Update** — cek & update Ringan CMS langsung dari dashboard (manifest
   JSON yang di-host sendiri, superadmin only, backup otomatis).
+- **Media** — kompresi gambar otomatis saat upload + offload media ke
+  R2/S3-compatible (Settings → Media).
 - **Login API (JWT)** opsional via `POST /api/v1/auth`.
 - **Pagination wajib** pada list endpoint (maks `per_page=100`).
 
@@ -206,6 +208,9 @@ curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts?tax=category&
   File disimpan dengan nama acak & MIME diverifikasi via `finfo_file()`.
 - **Rate limit:** per API key / per IP (default 120 req/60 detik, ubah lewat
   `.env`). Login dibatasi 5 percobaan / 15 menit per IP+username.
+- **Required field:** hanya dieksekusi saat `status` bukan `draft`. Simpan
+  sebagai `draft` memperbolehkan field wajib kosong; publish/archive wajib
+  lengkap.
 - **CORS:** isi `CORS_ORIGINS` di `.env` (dipisah koma) untuk whitelist origin.
   Tidak ada `Access-Control-Allow-Origin: *`.
 - **List params:** `page`, `per_page` (≤100), `status`, `sort`
@@ -236,6 +241,19 @@ curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts?tax=category&
 | Kelola content types    | ✓          | —      | —      |
 | Buat/edit/hapus entri   | ✓          | ✓      | —      |
 | Lihat entri/dashboard   | ✓          | ✓      | ✓      |
+
+## Media
+
+- **Settings → Media → Kompresi Gambar:** resize otomatis bila lebih lebar
+  dari `media_max_width` (JPEG/WebP juga di-re-encode sesuai `media_quality`).
+  Butuh ekstensi PHP **GD**.
+- **Settings → Media → Offload (R2/S3-compatible):** setiap upload disalin ke
+  bucket via SigV4 (tanpa SDK). Konfigurasi bisa dari halaman Settings atau
+  env `MEDIA_ENDPOINT`, `MEDIA_REGION`, `MEDIA_BUCKET`, `MEDIA_ACCESS_KEY`,
+  `MEDIA_SECRET_KEY`, `MEDIA_KEEP_LOCAL`, `MEDIA_PUBLIC_BASE` (env lebih aman
+  untuk secret). Tombol "Tes Koneksi" tersedia di halaman Media.
+- Jika `media_keep_local` dimatikan, file lokal dihapus setelah offload dan
+  route `/files/…` mengalihkan (302) ke `media_public_base`.
 
 ## Pembaruan
 

@@ -219,7 +219,7 @@ function handle_api_post(array $ct): void
         json_error('validation_error', 'Status tidak valid.', 400);
     }
 
-    $result = validate_entry_payload($payload, $fields, false);
+    $result = validate_entry_payload($payload, $fields, false, $status !== 'draft');
     if (!$result['ok']) {
         json_error('validation_error', 'Validasi gagal.', 422, $result['errors']);
     }
@@ -250,13 +250,21 @@ function handle_api_put(array $ct, ?int $id, bool $partial): void
         json_error('validation_error', 'Status tidak valid.', 400);
     }
 
-    $result = validate_entry_payload($payload, $fields, $partial);
+    $enforce_required = $status !== 'draft';
+    $result = validate_entry_payload($payload, $fields, $partial, $enforce_required);
     if (!$result['ok']) {
         json_error('validation_error', 'Validasi gagal.', 422, $result['errors']);
     }
 
     $existing = decode_entry_data($entry);
     $clean = $partial ? array_merge($existing, $result['data']) : $result['data'];
+    // Saat status non-draft, pastikan data FINAL (setelah merge PATCH) lengkap.
+    if ($enforce_required) {
+        $missing = entry_missing_required_fields($clean, $fields);
+        if ($missing !== []) {
+            json_error('validation_error', 'Validasi gagal.', 422, ['required' => $missing]);
+        }
+    }
 
     update_entry($id, $clean, $status);
     if (array_key_exists('terms', $body)) {
