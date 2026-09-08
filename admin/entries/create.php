@@ -47,6 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_csrf();
     $raw = is_array($_POST['data'] ?? null) ? $_POST['data'] : [];
     $files = $_FILES['data_file'] ?? [];
+    // Path file yang sudah berhasil di-upload pada submit sebelumnya (dibawa via hidden field)
+    $carried_files = is_array($_POST['data_file_current'] ?? null) ? $_POST['data_file_current'] : [];
+    $carried_gallery = is_array($_POST['data_gallery_current'] ?? null) ? $_POST['data_gallery_current'] : [];
+    $delete_files = is_array($_POST['data_delete_file'] ?? null) ? $_POST['data_delete_file'] : [];
+    $delete_gallery = is_array($_POST['data_delete_gallery'] ?? null) ? $_POST['data_delete_gallery'] : [];
     $form_status = sanitize_text($_POST['status'] ?? 'draft');
     if (!in_array($form_status, entry_statuses(), true)) {
         $form_status = 'draft';
@@ -57,7 +62,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $key = $field['field_key'];
         $type = $field['field_type'];
         if ($type === 'gallery') {
-            $gallery_items = [];
+            // Gabungkan gambar carried (submit sebelumnya) + upload baru.
+            $carried_list = isset($carried_gallery[$key]) && is_array($carried_gallery[$key])
+                ? array_values(array_filter(array_map('strval', $carried_gallery[$key]), fn($p) => $p !== ''))
+                : [];
+            $delete_ix = isset($delete_gallery[$key]) && is_array($delete_gallery[$key])
+                ? array_map('intval', $delete_gallery[$key])
+                : [];
+            $kept = [];
+            foreach ($carried_list as $gi => $gpath) {
+                if (in_array($gi, $delete_ix, true)) {
+                    delete_upload($gpath);
+                } else {
+                    $kept[] = $gpath;
+                }
+            }
             if (isset($files['name'][$key]) && is_array($files['name'][$key])) {
                 $count = count($files['name'][$key]);
                 for ($gi = 0; $gi < $count; $gi++) {
@@ -71,15 +90,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($gfile['error'] !== UPLOAD_ERR_NO_FILE) {
                         $gup = handle_upload($gfile, true);
                         if ($gup['ok']) {
-                            $gallery_items[] = $gup['path'];
+                            $kept[] = $gup['path'];
                         } else {
                             $upload_errors[$key] = array_merge($upload_errors[$key] ?? [], [$gup['error']]);
                         }
                     }
                 }
             }
-            $payload[$key] = $gallery_items;
+            $payload[$key] = array_values($kept);
         } elseif (in_array($type, ['image', 'file'], true)) {
+            $carried_path = isset($carried_files[$key]) && is_string($carried_files[$key])
+                ? trim($carried_files[$key])
+                : '';
+            $delete_mark = !empty($delete_files[$key]);
             $has_file = isset($files['name'][$key]) && is_string($files['name'][$key]) && $files['name'][$key] !== '';
             if ($has_file) {
                 $upload = handle_upload([
@@ -90,12 +113,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'size' => $files['size'][$key] ?? 0,
                 ], $type === 'image');
                 if ($upload['ok']) {
+                    // File baru menggantikan carried lama (carried adalah orpan submit sebelumnya)
+                    if ($carried_path !== '' && $carried_path !== $upload['path']) {
+                        delete_upload($carried_path);
+                    }
                     $payload[$key] = $upload['path'];
                 } else {
                     $upload_errors[$key] = [$upload['error']];
+                    // Pertahankan carried bila ada, agar tidak hilang pada re-render
+                    $payload[$key] = $carried_path !== '' ? $carried_path : null;
                 }
-            } else {
+            } elseif ($delete_mark) {
+                if ($carried_path !== '') {
+                    delete_upload($carried_path);
+                }
                 $payload[$key] = null;
+            } else {
+                // Tidak ada file baru → adopsi carried (path dari submit sebelumnya)
+                $payload[$key] = $carried_path !== '' ? $carried_path : null;
             }
         } elseif (array_key_exists($key, $raw)) {
             $payload[$key] = $raw[$key];
@@ -137,6 +172,15 @@ admin_header('Tambah Entri: ' . $ct['label'], 'entries');
     <div class="form-group">
       <label for="field_<?= e($field['field_key']) ?>"><?= e($field['label']) ?><?= $field['is_required'] ? ' <span class="req">*</span>' : '' ?></label>
       <?= render_field_input($field, $value) ?>
+      <?php if (in_array($field['field_type'], ['image', 'file'], true) && is_string($value) && $value !== ''): ?>
+        <input type="hidden" name="data_file_current[<?= e($field['field_key']) ?>]" value="<?= e($value) ?>">
+      <?php endif; ?>
+      <?php if (($field['field_type'] ?? '') === 'gallery' && is_array($value)): ?>
+        <?php foreach ($value as $gpath): ?>
+          <?php if (!is_string($gpath) || $gpath === '') { continue; } ?>
+          <input type="hidden" name="data_gallery_current[<?= e($field['field_key']) ?>][]" value="<?= e($gpath) ?>">
+        <?php endforeach; ?>
+      <?php endif; ?>
     </div>
   <?php endforeach; ?>
   <?php if ($taxonomies !== []): ?>
