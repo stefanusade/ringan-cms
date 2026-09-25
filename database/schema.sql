@@ -114,16 +114,26 @@ INSERT IGNORE INTO settings (setting_key, setting_value) VALUES
   ('api_path', 'api/v1'),
   ('update_url', 'https://api.github.com/repos/stefanusade/ringan-cms/releases/latest');
 
--- Taksonomi (kategori/tag ala WordPress)
+-- Taksonomi (kategori/tag ala WordPress) — bisa dipakai lintas content type
+-- (relasi many-to-many lewat taxonomy_content_types).
 CREATE TABLE IF NOT EXISTS taxonomies (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  content_type_id INT UNSIGNED NOT NULL,
+  content_type_id INT UNSIGNED NULL,   -- legacy: sumber kebenaran = taxonomy_content_types
   slug VARCHAR(100) NOT NULL,
   label VARCHAR(150) NOT NULL,
   is_hierarchical TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_tax_ct_slug (content_type_id, slug),
   CONSTRAINT fk_tax_content_type FOREIGN KEY (content_type_id) REFERENCES content_types(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS taxonomy_content_types (
+  taxonomy_id INT UNSIGNED NOT NULL,
+  content_type_id INT UNSIGNED NOT NULL,
+  PRIMARY KEY (taxonomy_id, content_type_id),
+  KEY idx_tct_content_type (content_type_id),
+  CONSTRAINT fk_tct_taxonomy FOREIGN KEY (taxonomy_id) REFERENCES taxonomies(id) ON DELETE CASCADE,
+  CONSTRAINT fk_tct_content_type FOREIGN KEY (content_type_id) REFERENCES content_types(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS terms (
@@ -146,4 +156,18 @@ CREATE TABLE IF NOT EXISTS entry_terms (
   KEY idx_et_term (term_id),
   CONSTRAINT fk_et_entry FOREIGN KEY (entry_id) REFERENCES content_entries(id) ON DELETE CASCADE,
   CONSTRAINT fk_et_term FOREIGN KEY (term_id) REFERENCES terms(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Pustaka media (media library)
+CREATE TABLE IF NOT EXISTS media (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  path VARCHAR(255) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  mime VARCHAR(100) NOT NULL,
+  size INT UNSIGNED NOT NULL DEFAULT 0,
+  uploaded_by INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_media_path (path),
+  KEY idx_media_created (created_at),
+  CONSTRAINT fk_media_user FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

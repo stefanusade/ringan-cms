@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($has_file) {
-        $upload = handle_upload($_FILES['favicon'], true);
+        $upload = handle_upload($_FILES['favicon'], true, (int) $user['id']);
         if ($upload['ok']) {
             if ($form['site_favicon'] !== '') {
                 delete_upload($form['site_favicon']);

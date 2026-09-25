@@ -27,7 +27,10 @@ function render_field_input(array $field, mixed $value = null): string
         case 'textarea':
         case 'richtext':
             $rows = $type === 'richtext' ? 8 : 5;
-            $cls = $type === 'richtext' ? ' class="richtext"' : '';
+            // Editor richtext: sertakan endpoint upload untuk gambar paste/drop.
+            $cls = $type === 'richtext'
+                ? ' class="richtext" data-media-upload="' . e(BASE_URL . '/admin/richtext-upload') . '"'
+                : '';
             return '<textarea ' . $attr . $cls . ' rows="' . $rows . '">' . e((string) ($value ?? '')) . '</textarea>';
 
         case 'number':

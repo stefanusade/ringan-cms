@@ -31,6 +31,8 @@ function admin_icon(string $name): string
         'entries' => '<path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M14 2v4h4M9 13h6M9 17h4"/>',
         'users' => '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-3.9 3.6-6 8-6s8 2.1 8 6"/>',
         'api-keys' => '<circle cx="8" cy="15" r="4"/><path d="M11 12 20 3M16 7l3 3M13 10l2 2"/>',
+        'media' => '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+        'taxonomies' => '<path d="M20.59 13.41 12 22l-9-9V3h10l7.59 7.59a2 2 0 0 1 0 2.82z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
         'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
         'settings' => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
         'updates' => '<path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>',
@@ -62,6 +64,12 @@ function admin_menu_items(array $user, string $active = ''): array
         $items[] = ['key' => 'content-types', 'label' => 'Content Types', 'icon' => 'content-types', 'url' => admin_url('content-types')];
     }
     $items[] = ['key' => 'entries', 'label' => 'Entries', 'icon' => 'entries', 'url' => admin_url('entries'), 'children' => $entries_children];
+    if (can_view_media($user)) {
+        $items[] = ['key' => 'media', 'label' => 'Media', 'icon' => 'media', 'url' => admin_url('media')];
+    }
+    if (can_manage_taxonomies($user)) {
+        $items[] = ['key' => 'taxonomies', 'label' => 'Taxonomies', 'icon' => 'taxonomies', 'url' => admin_url('taxonomies')];
+    }
     if (is_superadmin($user)) {
         $items[] = ['key' => 'users', 'label' => 'Users', 'icon' => 'users', 'url' => admin_url('users')];
         $items[] = ['key' => 'api-keys', 'label' => 'API Keys', 'icon' => 'api-keys', 'url' => admin_url('api-keys')];
@@ -96,7 +104,7 @@ function admin_header(string $title, string $active = ''): void
 <?php if ($_site_favicon !== ''): ?>
 <link rel="icon" href="<?= e($_site_favicon) ?>">
 <?php endif; ?>
-<link rel="stylesheet" href="<?= e(BASE_URL . '/admin/assets/css/admin.css') ?>">
+<link rel="stylesheet" href="<?= e(BASE_URL . '/admin/assets/css/admin.css?v=' . RINGAN_CMS_VERSION) ?>">
 </head>
 <body>
 <div class="layout">

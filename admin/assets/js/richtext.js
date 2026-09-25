@@ -3,6 +3,8 @@
  * Mengubah <textarea class="richtext"> menjadi editor WYSIWYG ringan.
  * HTML disinkronkan kembali ke textarea; konten tetap disanitasi server.
  * Tag yang didukung toolbar sesuai whitelist sanitize_richtext().
+ * Gambar hasil copy-paste (screenshot/file) atau data URI diunggah ke CMS
+ * lalu disisipkan sebagai <img src="/files/..."> agar tersimpan lokal/offload.
  */
 (function () {
   'use strict';
@@ -156,6 +158,141 @@
       textarea.value = editor.innerHTML;
     }
 
+    /* ===== Sisipkan gambar hasil copy-paste / drag & drop ===== */
+
+    function formToken() {
+      var form = textarea.form;
+      var input = form ? form.querySelector('input[name="csrf_token"]') : null;
+      return input ? input.value : '';
+    }
+
+    function currentRange() {
+      var sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+        return sel.getRangeAt(0).cloneRange();
+      }
+      return null;
+    }
+
+    function insertHtmlAt(range, html) {
+      editor.focus();
+      if (range) {
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      document.execCommand('insertHTML', false, html);
+    }
+
+    function uploadBlob(blob, url, token) {
+      return new Promise(function (resolve, reject) {
+        var fd = new FormData();
+        fd.append('csrf_token', token);
+        fd.append('file', blob, blob.name || 'gambar.png');
+        fetch(url, {
+          method: 'POST',
+          body: fd,
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (r) {
+          return r.json().catch(function () { return null; }).then(function (j) {
+            if (r.ok && j && j.success && j.data && j.data.url) {
+              resolve(j.data.url);
+            } else {
+              reject(new Error((j && j.error && j.error.message) || 'Gagal mengunggah gambar.'));
+            }
+          });
+        }).catch(function () {
+          reject(new Error('Gagal menghubungi server untuk mengunggah gambar.'));
+        });
+      });
+    }
+
+    function dataUriToBlob(dataUri) {
+      var comma = dataUri.indexOf(',');
+      var meta = dataUri.slice(0, comma);
+      var body = dataUri.slice(comma + 1);
+      var mime = (meta.match(/data:([^;]+)/) || [])[1] || 'image/png';
+      var bin = atob(body);
+      var arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return new Blob([arr], { type: mime });
+    }
+
+    function collectImageBlobs(cb) {
+      var blobs = [];
+      if (cb.items) {
+        for (var i = 0; i < cb.items.length; i++) {
+          var it = cb.items[i];
+          if (it.kind === 'file' && /^image\//i.test(it.type)) {
+            var f = it.getAsFile();
+            if (f) blobs.push(f);
+          }
+        }
+      }
+      if (blobs.length === 0 && cb.files) {
+        for (var j = 0; j < cb.files.length; j++) {
+          if (/^image\//i.test(cb.files[j].type)) blobs.push(cb.files[j]);
+        }
+      }
+      return blobs;
+    }
+
+    function pasteImages(blobs, html) {
+      var url = textarea.dataset.mediaUpload || '';
+      var token = formToken();
+
+      // Kumpulkan blob: dari clipboard + data URI base64 pada HTML yang ditempel.
+      var pending = blobs.slice();
+      if (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        Array.prototype.forEach.call(doc.querySelectorAll('img'), function (img) {
+          var src = img.getAttribute('src') || '';
+          if (/^data:image\//i.test(src)) {
+            try { pending.push(dataUriToBlob(src)); } catch (e) {}
+          }
+        });
+      }
+
+      if (!url || !token || pending.length === 0) {
+        if (html) document.execCommand('insertHTML', false, cleanPaste(html));
+        sync();
+        return;
+      }
+
+      var range = currentRange();
+      var marker = 'rte-up-' + Date.now() + '-' + Math.floor(Math.random() * 1000000);
+      insertHtmlAt(range, '<span id="' + marker + '" class="rte-uploading">Mengunggah gambar\u2026</span>');
+
+      var urls = [];
+      var chain = Promise.resolve();
+      pending.forEach(function (blob) {
+        chain = chain.then(function () { return uploadBlob(blob, url, token); })
+          .then(function (u) { urls.push(u); });
+      });
+
+      chain.then(function () {
+        var htmlOut = urls.map(function (u) {
+          return '<img src="' + u.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '" alt="">';
+        }).join('');
+        var el = editor.querySelector('#' + marker);
+        if (el) {
+          var tmp = document.createElement('span');
+          tmp.innerHTML = htmlOut;
+          while (tmp.firstChild) el.parentNode.insertBefore(tmp.firstChild, el);
+          el.parentNode.removeChild(el);
+        } else {
+          editor.insertAdjacentHTML('beforeend', htmlOut);
+        }
+        sync();
+      }).catch(function (err) {
+        var el = editor.querySelector('#' + marker);
+        if (el) el.parentNode.removeChild(el);
+        window.alert(err.message);
+        sync();
+      });
+    }
+
     function updateToolbar() {
       ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList'].forEach(function (cmd) {
         var btn = toolbar.querySelector('[data-cmd="' + cmd + '"]');
@@ -179,16 +316,39 @@
     editor.addEventListener('mouseup', updateToolbar);
 
     editor.addEventListener('paste', function (e) {
-      e.preventDefault();
       var cb = e.clipboardData || window.clipboardData;
-      var html = cb ? cb.getData('text/html') : '';
-      var text = cb ? cb.getData('text/plain') : '';
+      if (!cb) return;
+      var blobs = collectImageBlobs(cb);
+      var html = cb.getData ? (cb.getData('text/html') || '') : '';
+      var text = cb.getData ? (cb.getData('text/plain') || '') : '';
+
+      // Gambar biner (screenshot/file) atau data URI base64 → unggah dulu ke CMS.
+      if (blobs.length > 0 || /src\s*=\s*["']?data:image\//i.test(html)) {
+        e.preventDefault();
+        pasteImages(blobs, html);
+        return;
+      }
+
+      e.preventDefault();
       if (html) {
         document.execCommand('insertHTML', false, cleanPaste(html));
       } else if (text) {
         document.execCommand('insertText', false, text);
       }
       sync();
+    });
+
+    // Drag & drop gambar dari desktop / tab lain.
+    editor.addEventListener('drop', function (e) {
+      var dt = e.dataTransfer;
+      if (!dt || !dt.files || dt.files.length === 0) return;
+      var blobs = [];
+      for (var i = 0; i < dt.files.length; i++) {
+        if (/^image\//i.test(dt.files[i].type)) blobs.push(dt.files[i]);
+      }
+      if (blobs.length === 0) return;
+      e.preventDefault();
+      pasteImages(blobs, '');
     });
 
     var form = textarea.form;

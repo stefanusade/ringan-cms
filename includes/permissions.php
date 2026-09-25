@@ -34,3 +34,21 @@ function can_view_entries(array $user): bool
 {
     return in_array($user['role'] ?? '', ['superadmin', 'editor', 'viewer'], true);
 }
+
+/** Editor & superadmin boleh mengelola taksonomi (definisi + term). */
+function can_manage_taxonomies(array $user): bool
+{
+    return in_array($user['role'] ?? '', ['superadmin', 'editor'], true);
+}
+
+/** Semua user yang login boleh melihat pustaka media. */
+function can_view_media(array $user): bool
+{
+    return in_array($user['role'] ?? '', ['superadmin', 'editor', 'viewer'], true);
+}
+
+/** Editor & superadmin boleh mengunggah/menghapus media. */
+function can_manage_media(array $user): bool
+{
+    return in_array($user['role'] ?? '', ['superadmin', 'editor'], true);
+}

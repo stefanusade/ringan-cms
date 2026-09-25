@@ -47,6 +47,28 @@
       });
     });
 
+    // Copy URL (pustaka media)
+    document.querySelectorAll('[data-copy]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var text = btn.dataset.copy || '';
+        var done = function () {
+          var old = btn.textContent;
+          btn.textContent = 'Tersalin!';
+          setTimeout(function () { btn.textContent = old; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(function () {});
+        } else {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); done(); } catch (e) {}
+          document.body.removeChild(ta);
+        }
+      });
+    });
+
     // ===== Sidebar hide/show (mobile-friendly) =====
     var sidebar = document.getElementById('sidebar');
     var toggleBtn = document.getElementById('sidebar-toggle');

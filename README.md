@@ -32,7 +32,10 @@ menjadi risiko Anda sendiri.
   select, relation) tanpa mengubah kode. Setiap content type otomatis tersedia
   sebagai REST API endpoint `/api/v1/{slug}`.
 - **User management** dengan 3 role: `superadmin` (semua), `editor` (kelola
-  entri), `viewer` (baca saja).
+  entri, taksonomi, dan media), `viewer` (baca saja).
+- **Media library** — kelola semua file yang diunggah: grid pratinjau, pencarian,
+  hapus, copy URL, serta unggah langsung dari menu **Media**. File lama di
+  `storage/uploads` yang belum tercatat bisa didaftarkan lewat "Sinkron file lama".
 - **API key management** — key di-hash (SHA-256) saat disimpan, key asli hanya
   tampil sekali saat dibuat. Scope `read` / `read_write`, plus restriksi per
   content type.
@@ -40,14 +43,15 @@ menjadi risiko Anda sendiri.
   dan **path REST API** (menu Settings di admin; default `/api/v1`, bisa diubah
   menjadi prefix rahasia seperti `/content-api`). Info situs juga tersedia via
   endpoint publik `GET /api/v1/site`.
-- **Taksonomi** — kategori/tag/kustom per content type (hierarkis opsional);
+- **Taksonomi lintas content type** — kategori/tag/kustom yang bisa dipakai
+  oleh banyak content type sekaligus (relasi many-to-many), hierarkis opsional;
   term dikelola di admin, entri bisa multi-term. API: filter
   `?tax=<slug>&term=<slug>`, daftar `GET /api/v1/{slug}/taxonomies`, dan
   term ikut di payload setiap entri.
 - **Update** — cek & update Ringan CMS langsung dari dashboard (manifest
   JSON yang di-host sendiri, superadmin only, backup otomatis).
-- **Media** — kompresi gambar otomatis saat upload + offload media ke
-  R2/S3-compatible (Settings → Media).
+- **Media** — pustaka media (lihat/unggah/hapus) + kompresi gambar otomatis saat
+  upload + offload media ke R2/S3-compatible (Settings → Media).
 - **Login API (JWT)** opsional via `POST /api/v1/auth`.
 - **Pagination wajib** pada list endpoint (maks `per_page=100`).
 
@@ -235,14 +239,23 @@ curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts?tax=category&
 
 ## Role
 
-| Aksi                    | superadmin | editor | viewer |
-|-------------------------|:----------:|:------:|:------:|
-| Kelola user & API keys  | ✓          | —      | —      |
-| Kelola content types    | ✓          | —      | —      |
-| Buat/edit/hapus entri   | ✓          | ✓      | —      |
-| Lihat entri/dashboard   | ✓          | ✓      | ✓      |
+| Aksi                        | superadmin | editor | viewer |
+|-----------------------------|:----------:|:------:|:------:|
+| Kelola user & API keys      | ✓          | —      | —      |
+| Kelola content types/fields | ✓          | —      | —      |
+| Kelola taksonomi & term     | ✓          | ✓      | —      |
+| Buat/edit/hapus entri       | ✓          | ✓      | —      |
+| Unggah/hapus media          | ✓          | ✓      | —      |
+| Lihat entri/media/dashboard | ✓          | ✓      | ✓      |
 
 ## Media
+
+- **Menu Media:** pustaka semua file yang diunggah (grid pratinjau, pencarian,
+  hapus, copy URL, unggah langsung). File lama di `storage/uploads` yang belum
+  tercatat dapat didaftarkan via tombol "Sinkron file lama".
+- **Editor rich text:** gambar bisa disisipkan dengan copy-paste (screenshot/file)
+  atau drag & drop; gambar otomatis diunggah ke CMS lalu disimpan lokal (atau
+  di-offload bila R2/S3 aktif).
 
 - **Settings → Media → Kompresi Gambar:** resize otomatis bila lebih lebar
   dari `media_max_width` (JPEG/WebP juga di-re-encode sesuai `media_quality`).

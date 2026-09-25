@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'size' => $files['size'][$key][$gi] ?? 0,
                     ];
                     if ($gfile['error'] !== UPLOAD_ERR_NO_FILE) {
-                        $gup = handle_upload($gfile, true);
+                        $gup = handle_upload($gfile, true, (int) $user['id']);
                         if ($gup['ok']) {
                             $uploaded[] = $gup['path'];
                         } else {
@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'tmp_name' => $files['tmp_name'][$key] ?? '',
                     'error' => $files['error'][$key] ?? UPLOAD_ERR_NO_FILE,
                     'size' => $files['size'][$key] ?? 0,
-                ], $type === 'image');
+                ], $type === 'image', (int) $user['id']);
                 if ($upload['ok']) {
                     if (is_string($current) && $current !== '') {
                         delete_upload($current);
@@ -179,7 +179,7 @@ admin_header('Edit Entri #' . $id . ': ' . $ct['label'], 'entries');
         <strong><?= e($tax['label']) ?></strong>
         <div class="taxonomy-options">
           <?php if ($tax['terms'] === []): ?>
-            <span class="muted">Belum ada term — <a href="<?= e(admin_url('content-types/terms?taxonomy=' . (int) $tax['id'])) ?>" target="_blank" rel="noopener">kelola term</a>.</span>
+            <span class="muted">Belum ada term — <a href="<?= e(admin_url('taxonomies/terms?taxonomy=' . (int) $tax['id'])) ?>" target="_blank" rel="noopener">kelola term</a>.</span>
           <?php else: ?>
             <?php foreach ($tax['terms'] as $term): ?>
               <label class="checkbox-inline">

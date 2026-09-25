@@ -1,6 +1,6 @@
 <?php
 /**
- * Kelola term dalam sebuah taksonomi (superadmin only).
+ * Kelola term dalam sebuah taksonomi (superadmin & editor).
  */
 
 declare(strict_types=1);
@@ -19,7 +19,7 @@ require_once APP_ROOT . '/includes/audit_log.php';
 require_once APP_ROOT . '/admin/partials/header.php';
 require_once APP_ROOT . '/admin/partials/footer.php';
 
-$user = require_role('superadmin');
+$user = require_role('superadmin', 'editor');
 
 $tax_id = (int) ($_GET['taxonomy'] ?? 0);
 $tax = get_taxonomy($tax_id);
@@ -27,7 +27,7 @@ if ($tax === null) {
     http_response_code(404);
     exit('Taksonomi tidak ditemukan.');
 }
-$ct = get_content_type((int) $tax['content_type_id']);
+$used_by = get_taxonomy_content_types($tax_id);
 
 $errors = [];
 $form = ['name' => '', 'slug' => '', 'parent_id' => 0];
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             log_audit('delete_term', 'terms', (string) $tid, (int) $user['id']);
             flash_set('success', 'Term dihapus.');
         }
-        redirect_admin('content-types/terms?taxonomy=' . $tax_id);
+        redirect_admin('taxonomies/terms?taxonomy=' . $tax_id);
     }
 
     if ($action === 'create_term' || $action === 'update_term') {
@@ -68,8 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,148}[a-z0-9])?$/', $form['slug'])) {
             $errors['slug'] = 'Slug hanya huruf kecil, angka, dan strip.';
         }
-        $exclude_id = $action === 'update_term' && $edit_term !== null ? (int) $edit_term['id'] : null;
-        if (term_slug_exists($tax_id, $form['slug'], $exclude_id)) {
+        $exclude_id = $edit_term !== null ? (int) $edit_term['id'] : null;
+        if (!isset($errors['slug']) && term_slug_exists($tax_id, $form['slug'], $exclude_id)) {
             $errors['slug'] = 'Slug term sudah dipakai pada taksonomi ini.';
         }
         $parent_id = $form['parent_id'] > 0 ? $form['parent_id'] : null;
@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 log_audit('update_term', 'terms', (string) $edit_term['id'], (int) $user['id']);
                 flash_set('success', 'Term "' . $form['name'] . '" diperbarui.');
             }
-            redirect_admin('content-types/terms?taxonomy=' . $tax_id);
+            redirect_admin('taxonomies/terms?taxonomy=' . $tax_id);
         }
     }
 }
@@ -102,13 +102,22 @@ if ($edit_term !== null && $_SERVER['REQUEST_METHOD'] !== 'POST') {
     $form['parent_id'] = (int) $edit_term['parent_id'];
 }
 
-admin_header('Term: ' . $tax['label'], 'content-types');
+admin_header('Term: ' . $tax['label'], 'taxonomies');
 ?>
-<p class="muted">Taksonomi: <strong><?= e($tax['label']) ?></strong> (<code><?= e($tax['slug']) ?></code>) pada <strong><?= e($ct['label']) ?></strong> — <a href="<?= e(admin_url('content-types/taxonomies?content_type=' . (int) $ct['id'])) ?>">kembali</a></p>
+<p class="muted">
+  Taksonomi: <strong><?= e($tax['label']) ?></strong> (<code><?= e($tax['slug']) ?></code>)
+  — dipakai pada:
+  <?php if ($used_by === []): ?>
+    <span class="muted">belum dipakai</span>
+  <?php else: ?>
+    <strong><?= e(implode(', ', array_map(fn($c) => (string) $c['label'], $used_by))) ?></strong>
+  <?php endif; ?>
+  — <a href="<?= e(admin_url('taxonomies')) ?>">kembali</a>
+</p>
 
 <div class="card">
   <h2 class="section-title"><?= $edit_term !== null ? 'Edit Term: ' . e($edit_term['name']) : 'Tambah Term' ?></h2>
-  <form method="post" action="<?= e(admin_url('content-types/terms?taxonomy=' . $tax_id . ($edit_term !== null ? '&edit=' . (int) $edit_term['id'] : ''))) ?>">
+  <form method="post" action="<?= e(admin_url('taxonomies/terms?taxonomy=' . $tax_id . ($edit_term !== null ? '&edit=' . (int) $edit_term['id'] : ''))) ?>">
     <?= csrf_field() ?>
     <input type="hidden" name="action" value="<?= $edit_term !== null ? 'update_term' : 'create_term' ?>">
     <?= render_errors($errors) ?>
@@ -136,7 +145,7 @@ admin_header('Term: ' . $tax['label'], 'content-types');
     <?php endif; ?>
     <button type="submit" class="btn btn-primary"><?= $edit_term !== null ? 'Simpan Perubahan' : 'Tambah Term' ?></button>
     <?php if ($edit_term !== null): ?>
-      <a class="btn" href="<?= e(admin_url('content-types/terms?taxonomy=' . $tax_id)) ?>">Batal Edit</a>
+      <a class="btn" href="<?= e(admin_url('taxonomies/terms?taxonomy=' . $tax_id)) ?>">Batal Edit</a>
     <?php endif; ?>
   </form>
 </div>
@@ -155,8 +164,8 @@ admin_header('Term: ' . $tax['label'], 'content-types');
       <td><?= $t['parent_id'] !== null ? '#' . (int) $t['parent_id'] : '<span class="muted">—</span>' ?></td>
       <td><?= (int) $t['entry_count'] ?></td>
       <td class="actions">
-        <a class="btn btn-small" href="<?= e(admin_url('content-types/terms?taxonomy=' . $tax_id . '&edit=' . (int) $t['id'])) ?>">Edit</a>
-        <form method="post" action="<?= e(admin_url('content-types/terms?taxonomy=' . $tax_id)) ?>" data-confirm="Hapus term <?= e($t['name']) ?>?" class="inline-form">
+        <a class="btn btn-small" href="<?= e(admin_url('taxonomies/terms?taxonomy=' . $tax_id . '&edit=' . (int) $t['id'])) ?>">Edit</a>
+        <form method="post" action="<?= e(admin_url('taxonomies/terms?taxonomy=' . $tax_id)) ?>" data-confirm="Hapus term <?= e($t['name']) ?>?" class="inline-form">
           <?= csrf_field() ?>
           <input type="hidden" name="action" value="delete_term">
           <input type="hidden" name="term_id" value="<?= (int) $t['id'] ?>">

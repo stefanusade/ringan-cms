@@ -10,6 +10,7 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/validation.php';
 require_once __DIR__ . '/settings.php';
 require_once __DIR__ . '/s3.php';
+require_once __DIR__ . '/media.php';
 
 const UPLOAD_MIME_MAP = [
     'image/jpeg' => 'jpg',
@@ -53,7 +54,7 @@ function upload_error_message(int $code): string
 /**
  * @return array{ok:true,path:string,mime:string}|array{ok:false,error:string}
  */
-function handle_upload(array $file, bool $image_only = false): array
+function handle_upload(array $file, bool $image_only = false, ?int $uploaded_by = null): array
 {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
         return ['ok' => false, 'error' => upload_error_message((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE))];
@@ -91,6 +92,8 @@ function handle_upload(array $file, bool $image_only = false): array
         @unlink($full_path);
         return ['ok' => false, 'error' => $finalize['error']];
     }
+    $size = is_file($full_path) ? (int) filesize($full_path) : (int) ($file['size'] ?? 0);
+    media_register($relative, (string) ($file['name'] ?? $name), $mime, $size, $uploaded_by);
     return ['ok' => true, 'path' => $relative, 'mime' => $mime];
 }
 
@@ -99,7 +102,7 @@ function handle_upload(array $file, bool $image_only = false): array
  *
  * @return array{ok:true,path:string}|array{ok:false,error:string}
  */
-function save_base64_upload(string $data_uri, bool $image_only = false): array
+function save_base64_upload(string $data_uri, bool $image_only = false, ?int $uploaded_by = null): array
 {
     if (!preg_match('#^data:([a-z0-9.+-]+/[a-z0-9.+-]+);base64,(.+)$#is', $data_uri, $m)) {
         return ['ok' => false, 'error' => 'Format data URI tidak valid.'];
@@ -143,6 +146,8 @@ function save_base64_upload(string $data_uri, bool $image_only = false): array
         @unlink($full_path);
         return ['ok' => false, 'error' => $finalize['error']];
     }
+    $size = is_file($full_path) ? (int) filesize($full_path) : strlen($binary);
+    media_register($relative, 'upload-' . date('Ymd-His') . '.' . $ext, $real_mime, $size, $uploaded_by);
     return ['ok' => true, 'path' => $relative];
 }
 
@@ -175,6 +180,8 @@ function delete_upload(string $relative_path): void
     } catch (Throwable $e) {
         // abaikan — penghapusan jarak jauh tidak boleh menggagalkan request
     }
+    // Jaga konsistensi pustaka media.
+    media_delete_by_path($relative_path);
 }
 
 /* ===== Media: kompresi gambar (GD) & finalisasi upload ===== */

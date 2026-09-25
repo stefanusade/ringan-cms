@@ -13,12 +13,34 @@ function get_taxonomies(int $content_type_id): array
 {
     $db = get_db();
     $stmt = $db->prepare(
-        'SELECT t.*, (SELECT COUNT(*) FROM terms WHERE taxonomy_id = t.id) AS term_count
+        'SELECT t.*, (SELECT COUNT(*) FROM terms WHERE taxonomy_id = t.id) AS term_count,
+                (SELECT COUNT(*) FROM taxonomy_content_types WHERE taxonomy_id = t.id) AS content_type_count
          FROM taxonomies t
-         WHERE t.content_type_id = ?
-         ORDER BY t.created_at ASC, t.id ASC'
+         JOIN taxonomy_content_types tct ON tct.taxonomy_id = t.id
+         WHERE tct.content_type_id = ?
+         ORDER BY t.label ASC, t.id ASC'
     );
     $stmt->execute([$content_type_id]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Semua taksonomi (untuk pengelolaan global / lintas content type).
+ * Opsional difilter ke satu content type.
+ */
+function get_all_taxonomies(?int $filter_content_type_id = null): array
+{
+    $db = get_db();
+    $sql = 'SELECT t.*, (SELECT COUNT(*) FROM terms WHERE taxonomy_id = t.id) AS term_count
+            FROM taxonomies t';
+    $params = [];
+    if ($filter_content_type_id !== null) {
+        $sql .= ' JOIN taxonomy_content_types tct ON tct.taxonomy_id = t.id AND tct.content_type_id = ?';
+        $params[] = $filter_content_type_id;
+    }
+    $sql .= ' ORDER BY t.label ASC, t.id ASC';
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
     return $stmt->fetchAll();
 }
 
@@ -34,17 +56,22 @@ function get_taxonomy(int $id): ?array
 function get_taxonomy_by_slug(int $content_type_id, string $slug): ?array
 {
     $db = get_db();
-    $stmt = $db->prepare('SELECT * FROM taxonomies WHERE content_type_id = ? AND slug = ? LIMIT 1');
+    $stmt = $db->prepare(
+        'SELECT t.* FROM taxonomies t
+         JOIN taxonomy_content_types tct ON tct.taxonomy_id = t.id
+         WHERE tct.content_type_id = ? AND t.slug = ? LIMIT 1'
+    );
     $stmt->execute([$content_type_id, $slug]);
     $row = $stmt->fetch();
     return $row ?: null;
 }
 
-function taxonomy_slug_exists(int $content_type_id, string $slug, ?int $exclude_id = null): bool
+/** Slug taksonomi bersifat global (lintas content type). */
+function taxonomy_slug_exists(string $slug, ?int $exclude_id = null): bool
 {
     $db = get_db();
-    $sql = 'SELECT COUNT(*) FROM taxonomies WHERE content_type_id = ? AND slug = ?';
-    $params = [$content_type_id, $slug];
+    $sql = 'SELECT COUNT(*) FROM taxonomies WHERE slug = ?';
+    $params = [$slug];
     if ($exclude_id !== null) {
         $sql .= ' AND id <> ?';
         $params[] = $exclude_id;
@@ -54,19 +81,64 @@ function taxonomy_slug_exists(int $content_type_id, string $slug, ?int $exclude_
     return ((int) $stmt->fetchColumn()) > 0;
 }
 
-function create_taxonomy(int $content_type_id, string $slug, string $label, bool $is_hierarchical): int
+/** Daftar id content type yang memakai taksonomi ini. */
+function get_taxonomy_content_type_ids(int $taxonomy_id): array
 {
-    $db = get_db();
-    $stmt = $db->prepare('INSERT INTO taxonomies (content_type_id, slug, label, is_hierarchical) VALUES (?, ?, ?, ?)');
-    $stmt->execute([$content_type_id, $slug, $label, $is_hierarchical ? 1 : 0]);
-    return (int) $db->lastInsertId();
+    $stmt = get_db()->prepare('SELECT content_type_id FROM taxonomy_content_types WHERE taxonomy_id = ?');
+    $stmt->execute([$taxonomy_id]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
-function update_taxonomy(int $id, string $slug, string $label, bool $is_hierarchical): void
+/** Detail content type (untuk ditampilkan) yang memakai taksonomi ini. */
+function get_taxonomy_content_types(int $taxonomy_id): array
+{
+    $stmt = get_db()->prepare(
+        'SELECT ct.id, ct.slug, ct.label
+         FROM taxonomy_content_types tct
+         JOIN content_types ct ON ct.id = tct.content_type_id
+         WHERE tct.taxonomy_id = ?
+         ORDER BY ct.label ASC'
+    );
+    $stmt->execute([$taxonomy_id]);
+    return $stmt->fetchAll();
+}
+
+/** Ganti seluruh keterkaitan taksonomi ke content type (whitelist id valid). */
+function set_taxonomy_content_types(int $taxonomy_id, array $content_type_ids): void
+{
+    $db = get_db();
+    $ids = array_values(array_unique(array_filter(array_map('intval', $content_type_ids), fn($v) => $v > 0)));
+    $db->prepare('DELETE FROM taxonomy_content_types WHERE taxonomy_id = ?')->execute([$taxonomy_id]);
+    if ($ids === []) {
+        return;
+    }
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $valid = $db->prepare("SELECT id FROM content_types WHERE id IN ($placeholders)");
+    $valid->execute($ids);
+    $valid_ids = array_map('intval', $valid->fetchAll(PDO::FETCH_COLUMN));
+    $ins = $db->prepare('INSERT IGNORE INTO taxonomy_content_types (taxonomy_id, content_type_id) VALUES (?, ?)');
+    foreach ($valid_ids as $cid) {
+        $ins->execute([$taxonomy_id, $cid]);
+    }
+}
+
+function create_taxonomy(array $content_type_ids, string $slug, string $label, bool $is_hierarchical): int
+{
+    $db = get_db();
+    // content_type_id legacy dibiarkan NULL; keterkaitan via taxonomy_content_types.
+    $stmt = $db->prepare('INSERT INTO taxonomies (content_type_id, slug, label, is_hierarchical) VALUES (NULL, ?, ?, ?)');
+    $stmt->execute([$slug, $label, $is_hierarchical ? 1 : 0]);
+    $id = (int) $db->lastInsertId();
+    set_taxonomy_content_types($id, $content_type_ids);
+    return $id;
+}
+
+function update_taxonomy(int $id, string $slug, string $label, bool $is_hierarchical, array $content_type_ids): void
 {
     $db = get_db();
     $stmt = $db->prepare('UPDATE taxonomies SET slug = ?, label = ?, is_hierarchical = ? WHERE id = ?');
     $stmt->execute([$slug, $label, $is_hierarchical ? 1 : 0, $id]);
+    set_taxonomy_content_types($id, $content_type_ids);
 }
 
 function delete_taxonomy(int $id): void

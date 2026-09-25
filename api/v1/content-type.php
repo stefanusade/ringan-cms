@@ -126,7 +126,7 @@ function api_prepare_payload(array $body, array $fields): array
         $ftype = $field['field_type'] ?? '';
         if (in_array($ftype, ['image', 'file'], true) && is_string($raw)) {
             if (str_starts_with($raw, 'data:')) {
-                $res = save_base64_upload($raw, $ftype === 'image');
+                $res = save_base64_upload($raw, $ftype === 'image', $GLOBALS['api_user_id'] ?? null);
                 if (!$res['ok']) {
                     json_error('validation_error', 'Gagal memproses upload: ' . $res['error'], 400);
                 }
@@ -145,7 +145,7 @@ function api_prepare_payload(array $body, array $fields): array
                     json_error('validation_error', sprintf('Field "%s": item galeri tidak valid.', $key), 400);
                 }
                 if (str_starts_with($item, 'data:')) {
-                    $res = save_base64_upload($item, true);
+                    $res = save_base64_upload($item, true, $GLOBALS['api_user_id'] ?? null);
                     if (!$res['ok']) {
                         json_error('validation_error', 'Gagal memproses upload: ' . $res['error'], 400);
                     }
