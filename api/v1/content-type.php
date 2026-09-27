@@ -226,7 +226,8 @@ function handle_api_post(array $ct): void
 
     $all_term_ids = api_resolve_terms($body, $ct);
 
-    $entry_id = create_entry((int) $ct['id'], $result['data'], $status, (int) ($GLOBALS['api_user_id'] ?? 0));
+    // created_by = NULL bila dibuat via API key (bukan user login) — kolom FK nullable.
+    $entry_id = create_entry((int) $ct['id'], $result['data'], $status, $GLOBALS['api_user_id'] ?? null);
     set_entry_terms($entry_id, $all_term_ids);
     log_audit('api_create_entry', 'content_entries', (string) $entry_id, $GLOBALS['api_user_id'] ?? null);
     json_response(['success' => true, 'data' => ['id' => $entry_id]], 201);

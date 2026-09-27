@@ -69,4 +69,13 @@ if (api_rate_limited($rate_key_id)) {
 }
 record_api_request($rate_key_id);
 
+// Endpoint media (unggah file dari frontend): /api/v1/media
+if ($slug === 'media') {
+    if (count($segments) > 1) {
+        json_error('not_found', 'Endpoint tidak ditemukan.', 404);
+    }
+    require_once __DIR__ . '/media.php';
+    exit;
+}
+
 require_once __DIR__ . '/content-type.php';

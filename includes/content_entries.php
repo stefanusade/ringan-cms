@@ -90,7 +90,7 @@ function get_entry_for_content_type(int $id, int $content_type_id): ?array
     return $row ?: null;
 }
 
-function create_entry(int $content_type_id, array $data, string $status, int $created_by): int
+function create_entry(int $content_type_id, array $data, string $status, ?int $created_by = null): int
 {
     $db = get_db();
     $stmt = $db->prepare(

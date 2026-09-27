@@ -190,6 +190,12 @@ curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts/taxonomies"
 
 # List entri yang difilter per term
 curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts?tax=category&term=berita"
+
+# Unggah media (gambar/file) — untuk form frontend
+curl -X POST -H "X-API-Key: rcm_xxx" \
+  -F "file=@/path/foto.jpg" \
+  -F "kind=image" \
+  "https://cms.example.com/api/v1/media"
 ```
 
 ### Format respons
@@ -207,9 +213,17 @@ curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts?tax=category&
 
 - **Whitelist field:** hanya key yang terdaftar di content type yang diterima;
   field lain ditolak `400`, bukan diabaikan diam-diam.
-- **Upload via API:** field `image`/`file` menerima path relatif hasil upload
-  admin (mis. `2026/09/abc.png`) atau data URI `data:image/png;base64,....`.
-  File disimpan dengan nama acak & MIME diverifikasi via `finfo_file()`.
+- **Upload via API:**
+  - Endpoint **`POST /api/v1/media`** (`multipart/form-data`) untuk mengunggah
+    file dari frontend. Field `file` (wajib), `kind` = `image` (khusus gambar)
+    atau `file` (default). Mengembalikan `{ path, url, mime, name, size }`
+    (`url` siap dipakai). Butuh API key scope `read_write` atau JWT
+    editor/superadmin — bukan endpoint publik.
+  - Field `image`/`file` juga menerima path relatif hasil upload (mis.
+    `2026/09/abc.png`) atau data URI `data:image/png;base64,....`.
+  - File disimpan dengan nama acak & MIME diverifikasi via `finfo_file()`.
+- **Entri dari API key:** `created_by` diisi `NULL` (bukan user) — dapat
+  dikosongkan karena kolomnya nullable, aman untuk pengiriman form publik.
 - **Rate limit:** per API key / per IP (default 120 req/60 detik, ubah lewat
   `.env`). Login dibatasi 5 percobaan / 15 menit per IP+username.
 - **Required field:** hanya dieksekusi saat `status` bukan `draft`. Simpan
