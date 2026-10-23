@@ -18,7 +18,8 @@ function get_db(): PDO
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
-        PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES ' . DB_CHARSET,
+        // Charset sudah di-set lewat DSN (setara SET NAMES). Jangan tambahkan
+        // PDO::MYSQL_ATTR_INIT_COMMAND di sini: constant itu deprecated di PHP 8.5.
     ];
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
     return $pdo;
