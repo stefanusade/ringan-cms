@@ -340,13 +340,18 @@ admin_header('Import WordPress', 'import');
   </form>
 </div>
 
-<?php if ($summary['keys'] !== []): ?>
+<?php if ($summary['keys'] !== [] || ($summary['thumbnails'] ?? 0) > 0): ?>
 <div class="card">
   <h2>Meta key terdeteksi (ACF/custom fields)</h2>
+  <p class="muted">
+    Gambar unggulan (<code>_thumbnail_id</code>): <strong><?= (int) ($summary['thumbnails'] ?? 0) ?></strong> post terdeteksi —
+    pilih sumber <code>post:thumbnail</code> pada field bertipe image.
+  </p>
   <p class="muted">
     Meta yang diawali <code>_</code> disembunyikan (field key internal ACF). Repeater:
     <?= $summary['repeaters'] === [] ? '<em>tidak ada</em>' : '<code>' . e(implode(', ', array_keys($summary['repeaters']))) . '</code>' ?>
   </p>
+  <?php if ($summary['keys'] !== []): ?>
   <div class="wp-import-scroll">
     <table class="table">
       <thead><tr><th>Meta key</th><th>Terisi</th><th>Contoh nilai</th></tr></thead>
@@ -361,6 +366,7 @@ admin_header('Import WordPress', 'import');
       </tbody>
     </table>
   </div>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 

@@ -295,9 +295,12 @@ curl -X POST -H "X-API-Key: rcm_xxx" \
 - Alur: upload → pilih post type → petakan field → **verifikasi** → import
   bertahap (20 item per batch, tersedia opsi "proses otomatis").
 - Field CMS dapat diisi dari judul/konten/excerpt/slug/tanggal/author atau meta
-  key. Tanggal ACF `Ymd` (date picker) dinormalisasi otomatis; nilai select di
-  luar opsi dikosongkan dengan peringatan; field wajib yang belum terpetakan
-  memblokir import (opsi "simpan sebagai draft" tetap tersedia).
+  key. Gambar unggulan WordPress (`_thumbnail_id`) tersedia sebagai sumber
+  `post:thumbnail` dan otomatis dipilih untuk field image bernama `gambar`,
+  `foto`, `thumbnail`, `featured_image`, dan sejenisnya. Tanggal ACF `Ymd`
+  (date picker) dinormalisasi otomatis; nilai select di luar opsi dikosongkan
+  dengan peringatan; field wajib yang belum terpetakan memblokir import (opsi
+  "simpan sebagai draft" tetap tersedia).
 - Gambar/file ACF diunduh ke `storage/uploads` (batas `MAX_UPLOAD_SIZE`, hanya
   host publik — proteksi SSRF, tanpa redirect). Sertakan media pada export agar
   attachment dapat di-resolve.

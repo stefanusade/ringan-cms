@@ -603,14 +603,18 @@ function wp_import_select_items(array $items, string $post_type): array
 /**
  * Ringkasan meta key untuk UI pemetaan.
  *
- * @return array{keys:array<string,array{count:int,samples:string[],serialized:bool,array:bool}>,repeaters:array<string,int>,total_items:int}
+ * @return array{keys:array<string,array{count:int,samples:string[],serialized:bool,array:bool}>,repeaters:array<string,int>,total_items:int,thumbnails:int}
  */
 function wp_import_meta_summary(array $items, string $post_type): array
 {
     $keys = [];
     $repeaters = [];
+    $thumbnails = 0;
     $selected = wp_import_select_items($items, $post_type);
     foreach ($selected as $item) {
+        if (trim((string) ($item['meta_raw']['_thumbnail_id'] ?? '')) !== '') {
+            $thumbnails++;
+        }
         foreach ($item['meta_raw'] ?? [] as $key => $raw) {
             $key = (string) $key;
             if ($key === '' || $key[0] === '_') {
@@ -639,7 +643,7 @@ function wp_import_meta_summary(array $items, string $post_type): array
     }
     ksort($keys);
     ksort($repeaters);
-    return ['keys' => $keys, 'repeaters' => $repeaters, 'total_items' => count($selected)];
+    return ['keys' => $keys, 'repeaters' => $repeaters, 'total_items' => count($selected), 'thumbnails' => $thumbnails];
 }
 
 /**
@@ -653,6 +657,7 @@ function wp_import_source_choices(array $summary): array
         'post:title' => 'Judul post',
         'post:content' => 'Konten (HTML)',
         'post:excerpt' => 'Excerpt',
+        'post:thumbnail' => 'Gambar unggulan (featured image)',
         'post:slug' => 'Slug',
         'post:date' => 'Tanggal publish',
         'post:modified' => 'Tanggal modifikasi',
@@ -696,16 +701,33 @@ function wp_import_default_mapping(array $fields, array $summary): array
         'status' => 'post:status', 'author' => 'post:author', 'penulis' => 'post:author',
     ];
     $mapping = [];
+    $image_aliases = [
+        'thumbnail', 'featured_image', 'featured', 'gambar_utama', 'foto_utama',
+        'gambar_unggulan', 'foto_unggulan', 'cover', 'image', 'gambar', 'foto',
+    ];
+    $thumbnails = (int) ($summary['thumbnails'] ?? 0);
+    $image_field_count = 0;
+    foreach ($fields as $candidate) {
+        if (($candidate['field_type'] ?? '') === 'image') {
+            $image_field_count++;
+        }
+    }
     foreach ($fields as $field) {
         $key = (string) $field['field_key'];
         $normalized = strtolower((string) preg_replace('/[^a-z0-9]+/i', '_', $key));
         $normalized = trim($normalized, '_');
+        $label_slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '_', (string) ($field['label'] ?? '')));
+        $label_slug = trim($label_slug, '_');
         if (isset($summary['keys'][$key])) {
             $mapping[$key] = 'meta:' . $key;
         } elseif (isset($aliases[$normalized])) {
             $mapping[$key] = $aliases[$normalized];
         } elseif (isset($summary['keys'][$normalized])) {
             $mapping[$key] = 'meta:' . $normalized;
+        } elseif (($field['field_type'] ?? '') === 'image' && $thumbnails > 0
+            && (in_array($normalized, $image_aliases, true) || in_array($label_slug, $image_aliases, true)
+                || $image_field_count === 1)) {
+            $mapping[$key] = 'post:thumbnail';
         } else {
             $mapping[$key] = '';
         }
@@ -734,6 +756,7 @@ function wp_import_extract_source(array $item, string $source): mixed
         'post:title' => $item['title'] ?? '',
         'post:content' => $item['content'] ?? '',
         'post:excerpt' => $item['excerpt'] ?? '',
+        'post:thumbnail' => $item['meta']['_thumbnail_id'] ?? null,
         'post:slug' => $item['slug'] ?? '',
         'post:date' => $item['date'] ?? '',
         'post:modified' => $item['modified'] ?? '',
