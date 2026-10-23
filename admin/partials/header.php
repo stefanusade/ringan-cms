@@ -36,6 +36,8 @@ function admin_icon(string $name): string
         'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
         'settings' => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
         'updates' => '<path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>',
+        'import' => '<path d="M12 3v11m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
+        'tools' => '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4 2.6-2.6z"/>',
     ];
     $body = $icons[$name] ?? $icons['entries'];
     return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $body . '</svg>';
@@ -72,7 +74,6 @@ function admin_menu_items(array $user, string $active = ''): array
     }
     if (is_superadmin($user)) {
         $items[] = ['key' => 'users', 'label' => 'Users', 'icon' => 'users', 'url' => admin_url('users')];
-        $items[] = ['key' => 'api-keys', 'label' => 'API Keys', 'icon' => 'api-keys', 'url' => admin_url('api-keys')];
         $items[] = [
             'key' => 'settings',
             'label' => 'Settings',
@@ -81,8 +82,22 @@ function admin_menu_items(array $user, string $active = ''): array
             'children' => [
                 ['label' => 'General', 'url' => admin_url('settings'), 'active' => $active === 'settings'],
                 ['label' => 'Media', 'url' => admin_url('settings/media'), 'active' => $active === 'settings-media'],
+                ['label' => 'API Keys', 'url' => admin_url('api-keys'), 'active' => $active === 'api-keys'],
             ],
         ];
+    }
+    if (can_write_entries($user)) {
+        $items[] = [
+            'key' => 'tools',
+            'label' => 'Tools',
+            'icon' => 'tools',
+            'url' => admin_url('tools'),
+            'children' => [
+                ['label' => 'WordPress Import', 'url' => admin_url('import'), 'active' => $active === 'import'],
+            ],
+        ];
+    }
+    if (is_superadmin($user)) {
         $items[] = ['key' => 'updates', 'label' => 'Updates', 'icon' => 'updates', 'url' => admin_url('updates')];
     }
     return $items;

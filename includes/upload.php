@@ -98,6 +98,77 @@ function handle_upload(array $file, bool $image_only = false, ?int $uploaded_by 
 }
 
 /**
+ * Simpan isi file biner (hasil decode data URI / unduhan) lewat pipeline upload aman.
+ *
+ * @return array{ok:true,path:string,mime:string}|array{ok:false,error:string}
+ */
+function save_binary_upload(
+    string $binary,
+    bool $image_only = false,
+    ?int $uploaded_by = null,
+    string $original_name = '',
+    ?string $claimed_mime = null
+): array {
+    if ($binary === '') {
+        return ['ok' => false, 'error' => 'File kosong.'];
+    }
+    if (strlen($binary) > MAX_UPLOAD_SIZE) {
+        return ['ok' => false, 'error' => 'Ukuran file melebihi batas.'];
+    }
+    $tmp = tempnam(sys_get_temp_dir(), 'rcm');
+    if ($tmp === false) {
+        return ['ok' => false, 'error' => 'Gagal membuat file temporary.'];
+    }
+    if (file_put_contents($tmp, $binary) === false) {
+        @unlink($tmp);
+        return ['ok' => false, 'error' => 'Gagal menulis file temporary.'];
+    }
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $real_mime = $finfo->file($tmp);
+    @unlink($tmp);
+    if ($real_mime === false) {
+        return ['ok' => false, 'error' => 'Tidak dapat memverifikasi tipe file.'];
+    }
+    if ($claimed_mime !== null && $real_mime !== strtolower($claimed_mime)) {
+        return ['ok' => false, 'error' => 'Isi file tidak sesuai dengan tipe yang diklaim.'];
+    }
+    $map = $image_only ? IMAGE_MIME_MAP : UPLOAD_MIME_MAP;
+    if (!isset($map[$real_mime])) {
+        return ['ok' => false, 'error' => 'Tipe file tidak diizinkan.'];
+    }
+    $ext = $map[$real_mime];
+    $name = bin2hex(random_bytes(16)) . '.' . $ext;
+    $subdir = date('Y/m');
+    $dir = UPLOAD_DIR . '/' . $subdir;
+    if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+        return ['ok' => false, 'error' => 'Gagal membuat direktori penyimpanan.'];
+    }
+    $full_path = $dir . '/' . $name;
+    if (file_put_contents($full_path, $binary) === false) {
+        return ['ok' => false, 'error' => 'Gagal menyimpan file.'];
+    }
+    @chmod($full_path, 0640);
+    $relative = $subdir . '/' . $name;
+    $finalize = finalize_uploaded_media($full_path, $relative, $real_mime, $image_only);
+    if (!$finalize['ok']) {
+        @unlink($full_path);
+        return ['ok' => false, 'error' => $finalize['error']];
+    }
+    $size = is_file($full_path) ? (int) filesize($full_path) : strlen($binary);
+    $original_name = trim(str_replace('\\', '/', $original_name));
+    $original_name = mb_substr(basename($original_name), 0, 255);
+    $original_name = preg_replace('/[\x00-\x1F\x7F]/u', '', $original_name) ?? '';
+    if ($original_name === '') {
+        $original_name = 'upload-' . date('Ymd-His');
+    }
+    if (pathinfo($original_name, PATHINFO_EXTENSION) === '') {
+        $original_name .= '.' . $ext;
+    }
+    media_register($relative, $original_name, $real_mime, $size, $uploaded_by);
+    return ['ok' => true, 'path' => $relative, 'mime' => $real_mime];
+}
+
+/**
  * Simpan upload berbasis data URI (base64) dari API.
  *
  * @return array{ok:true,path:string}|array{ok:false,error:string}
@@ -116,39 +187,17 @@ function save_base64_upload(string $data_uri, bool $image_only = false, ?int $up
     if (!isset($map[$mime])) {
         return ['ok' => false, 'error' => 'Tipe file tidak diizinkan.'];
     }
-    if (strlen($binary) > MAX_UPLOAD_SIZE) {
-        return ['ok' => false, 'error' => 'Ukuran file melebihi batas.'];
+    $result = save_binary_upload(
+        $binary,
+        $image_only,
+        $uploaded_by,
+        'upload-' . date('Ymd-His'),
+        $mime
+    );
+    if (!$result['ok']) {
+        return $result;
     }
-    $tmp = tempnam(sys_get_temp_dir(), 'rcm');
-    if ($tmp === false) {
-        return ['ok' => false, 'error' => 'Gagal membuat file temporary.'];
-    }
-    file_put_contents($tmp, $binary);
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $real_mime = $finfo->file($tmp);
-    @unlink($tmp);
-    if ($real_mime !== $mime || !isset($map[$real_mime])) {
-        return ['ok' => false, 'error' => 'Isi file tidak sesuai dengan tipe yang diklaim.'];
-    }
-    $ext = $map[$real_mime];
-    $name = bin2hex(random_bytes(16)) . '.' . $ext;
-    $subdir = date('Y/m');
-    $dir = UPLOAD_DIR . '/' . $subdir;
-    if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
-        return ['ok' => false, 'error' => 'Gagal membuat direktori penyimpanan.'];
-    }
-    $full_path = $dir . '/' . $name;
-    file_put_contents($full_path, $binary);
-    @chmod($full_path, 0640);
-    $relative = $subdir . '/' . $name;
-    $finalize = finalize_uploaded_media($full_path, $relative, $real_mime, $image_only);
-    if (!$finalize['ok']) {
-        @unlink($full_path);
-        return ['ok' => false, 'error' => $finalize['error']];
-    }
-    $size = is_file($full_path) ? (int) filesize($full_path) : strlen($binary);
-    media_register($relative, 'upload-' . date('Ymd-His') . '.' . $ext, $real_mime, $size, $uploaded_by);
-    return ['ok' => true, 'path' => $relative];
+    return ['ok' => true, 'path' => $result['path']];
 }
 
 /**

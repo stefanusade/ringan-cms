@@ -36,9 +36,13 @@ menjadi risiko Anda sendiri.
 - **Media library** — kelola semua file yang diunggah: grid pratinjau, pencarian,
   hapus, copy URL, serta unggah langsung dari menu **Media**. File lama di
   `storage/uploads` yang belum tercatat bisa didaftarkan lewat "Sinkron file lama".
+- **Import dari WordPress (WXR)** — impor post + meta ACF ke content type
+  pilihan: pemetaan field otomatis/manual, verifikasi nilai sebelum eksekusi,
+  unduh gambar/file ke media library, pemetaan kategori/tag, dan anti-duplikat
+  (import ulang bisa memperbarui entri yang sama).
 - **API key management** — key di-hash (SHA-256) saat disimpan, key asli hanya
   tampil sekali saat dibuat. Scope `read` / `read_write`, plus restriksi per
-  content type.
+  content type (menu **Settings → API Keys**).
 - **Settings** — atur judul situs, tagline, deskripsi, favicon, **zona waktu**,
   dan **path REST API** (menu Settings di admin; default `/api/v1`, bisa diubah
   menjadi prefix rahasia seperti `/content-api`). Info situs juga tersedia via
@@ -259,6 +263,7 @@ curl -X POST -H "X-API-Key: rcm_xxx" \
 | Kelola content types/fields | ✓          | —      | —      |
 | Kelola taksonomi & term     | ✓          | ✓      | —      |
 | Buat/edit/hapus entri       | ✓          | ✓      | —      |
+| Import dari WordPress       | ✓          | ✓      | —      |
 | Unggah/hapus media          | ✓          | ✓      | —      |
 | Lihat entri/media/dashboard | ✓          | ✓      | ✓      |
 
@@ -281,6 +286,31 @@ curl -X POST -H "X-API-Key: rcm_xxx" \
   untuk secret). Tombol "Tes Koneksi" tersedia di halaman Media.
 - Jika `media_keep_local` dimatikan, file lokal dihapus setelah offload dan
   route `/files/…` mengalihkan (302) ke `media_public_base`.
+
+## Import dari WordPress
+
+- Menu **Tools → WordPress Import** (superadmin/editor) menerima file **WXR** dari
+  Tools → Export. Halaman **Tools** menjadi daftar utilitas admin; import tidak
+  perlu akses database WordPress.
+- Alur: upload → pilih post type → petakan field → **verifikasi** → import
+  bertahap (20 item per batch, tersedia opsi "proses otomatis").
+- Field CMS dapat diisi dari judul/konten/excerpt/slug/tanggal/author atau meta
+  key. Tanggal ACF `Ymd` (date picker) dinormalisasi otomatis; nilai select di
+  luar opsi dikosongkan dengan peringatan; field wajib yang belum terpetakan
+  memblokir import (opsi "simpan sebagai draft" tetap tersedia).
+- Gambar/file ACF diunduh ke `storage/uploads` (batas `MAX_UPLOAD_SIZE`, hanya
+  host publik — proteksi SSRF, tanpa redirect). Sertakan media pada export agar
+  attachment dapat di-resolve.
+- Anti-duplikat memakai tabel `import_refs` (post ID WordPress → entry), jadi
+  import ulang dapat memilih "lewati" atau "perbarui" tanpa entri ganda.
+- Repeater ACF belum dipetakan otomatis (CMS belum punya tipe repeater); meta
+  `repeater_0_*` dilaporkan pada halaman verifikasi.
+- File kerja di `storage/tmp/import` dibersihkan otomatis setelah 24 jam. Batas
+  ukuran file dapat diubah via env `WP_IMPORT_MAX_BYTES` (default 32 MB); untuk
+  file sangat besar, pecah WXR atau naikkan `memory_limit` karena hasil parsing
+  dimuat per batch.
+- Parser WXR ditulis tanpa ekstensi XML: DOCTYPE/ENTITY ditolak, sehingga aman
+  dari XXE dan tidak butuh `ext-simplexml`.
 
 ## Pembaruan
 
