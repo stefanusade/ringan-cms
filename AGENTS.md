@@ -7,6 +7,32 @@ bukan saran opsional.
 
 ---
 
+## 0. GOLDEN RULE — Arsip rilis WAJIB di bawah 1 MB
+
+**"Ringan" adalah kontrak produk, bukan slogan.** Arsip rilis project
+(`.zip` atau `.tar.gz`) WAJIB **di bawah 1.000.000 byte (1 MB desimal)**, diukur
+dari file yang di-track Git.
+
+- Jangan menambahkan dependency/library besar, binary, font, gambar besar,
+  build artifact, atau arsip lain ke repo. Upload user tetap di
+  `storage/uploads` dan tidak ikut arsip rilis.
+- Jangan commit `vendor/`, `node_modules/`, `dist/`, `build/`, atau file
+  `.zip`/`.tar.gz` lain.
+- Jika fitur baru membuat arsip melewati batas, optimalkan atau hapus aset.
+  **JANGAN menaikkan batas ini.**
+- Target aman: **< 900 KB** agar ada headroom.
+- Verifikasi setiap kali menyatakan tugas/rilis selesai:
+
+```sh
+git archive --format=zip --output=/tmp/ringan-cms.zip HEAD
+stat -c%s /tmp/ringan-cms.zip          # harus < 1000000
+
+git archive --format=tar.gz --output=/tmp/ringan-cms.tar.gz HEAD
+stat -c%s /tmp/ringan-cms.tar.gz       # harus < 1000000
+```
+
+---
+
 ## 1. Ringkasan Project
 
 Membangun **Headless CMS super ringan** dengan:
@@ -248,6 +274,8 @@ input user, autentikasi, atau file:
 - Jangan menyimpan file upload di dalam folder yang bisa dieksekusi PHP.
 - Jangan membuat query dengan variabel yang langsung disisipkan ke string SQL.
 - Jangan mengekspos pesan error mentah (stack trace, query, path server) ke response API/HTML.
+- Jangan commit aset besar (vendor/build/binary/font/gambar/arsip) yang membuat
+  arsip rilis mencapai atau melewati 1 MB.
 - Jangan melewati checklist Bab 6 walau untuk fitur "sementara"/prototype — kalau
   memang sengaja disederhanakan untuk prototype, agent harus menyebutkannya secara
   eksplisit ke user, bukan diam-diam.
@@ -261,3 +289,6 @@ input user, autentikasi, atau file:
 3. Cocokkan fitur baru terhadap checklist Bab 6.
 4. Jika fitur menyentuh API publik, uji dengan contoh request (curl) untuk memastikan
    field yang tidak terdaftar ditolak, dan API key invalid mengembalikan 401.
+5. Ukur arsip rilis (`.zip` dan `.tar.gz`) dan pastikan **< 1.000.000 byte**.
+   Laporkan angka ukuran arsip di ringkasan akhir; jika melebihi batas, perbaiki
+   sebelum menyatakan selesai.

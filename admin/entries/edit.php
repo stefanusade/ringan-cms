@@ -18,6 +18,7 @@ require_once APP_ROOT . '/includes/content_entries.php';
 require_once APP_ROOT . '/includes/render.php';
 require_once APP_ROOT . '/includes/upload.php';
 require_once APP_ROOT . '/includes/audit_log.php';
+require_once APP_ROOT . '/includes/webhooks.php';
 require_once APP_ROOT . '/includes/taxonomies.php';
 require_once APP_ROOT . '/admin/partials/header.php';
 require_once APP_ROOT . '/admin/partials/footer.php';
@@ -39,6 +40,10 @@ $entry = get_entry_for_content_type($id, $ct_id);
 if ($entry === null) {
     http_response_code(404);
     exit('Entri tidak ditemukan.');
+}
+if (entry_is_trashed($entry)) {
+    flash_set('error', 'Entri #' . $id . ' ada di Trash. Pulihkan terlebih dahulu sebelum mengedit.');
+    redirect_admin('entries?content_type=' . $ct_id . '&status=trash');
 }
 $fields = get_fields($ct_id);
 $existing = decode_entry_data($entry);
@@ -153,6 +158,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         set_entry_terms($id, $all_term_ids);
         log_audit('update_entry', 'content_entries', (string) $id, (int) $user['id']);
+        $old_status = (string) $entry['status'];
+        if ($form_status === 'published') {
+            webhook_queue_event(
+                $old_status === 'published' ? 'entry.updated' : 'entry.published',
+                $ct,
+                $id,
+                $user,
+                ['status' => 'published', 'via' => 'admin']
+            );
+        } elseif ($old_status === 'published') {
+            webhook_queue_event('entry.unpublished', $ct, $id, $user, ['status' => $form_status, 'via' => 'admin']);
+        }
         flash_set('success', 'Entri #' . $id . ' diperbarui.');
         redirect_admin('entries?content_type=' . $ct_id);
     }

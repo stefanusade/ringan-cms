@@ -18,6 +18,7 @@ require_once APP_ROOT . '/includes/content_entries.php';
 require_once APP_ROOT . '/includes/render.php';
 require_once APP_ROOT . '/includes/upload.php';
 require_once APP_ROOT . '/includes/audit_log.php';
+require_once APP_ROOT . '/includes/webhooks.php';
 require_once APP_ROOT . '/includes/taxonomies.php';
 require_once APP_ROOT . '/admin/partials/header.php';
 require_once APP_ROOT . '/admin/partials/footer.php';
@@ -156,6 +157,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         set_entry_terms($entry_id, $all_term_ids);
         log_audit('create_entry', 'content_entries', (string) $entry_id, (int) $user['id']);
+        if ($form_status === 'published') {
+            webhook_queue_event('entry.published', $ct, $entry_id, $user, ['status' => 'published', 'via' => 'admin']);
+        }
         flash_set('success', 'Entri #' . $entry_id . ' dibuat.');
         redirect_admin('entries?content_type=' . $ct_id);
     }

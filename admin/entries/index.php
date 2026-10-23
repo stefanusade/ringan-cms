@@ -1,6 +1,9 @@
 <?php
 /**
  * Daftar entri per content type.
+ *
+ * Tab: Semua / Published / Draft / Trash. Entri Trash adalah soft delete dan
+ * tidak muncul di tab "Semua" maupun API. Aksi massal ditangani entries/bulk.php.
  */
 
 declare(strict_types=1);
@@ -47,50 +50,122 @@ if ($ct === null) {
 }
 
 $status = (string) ($_GET['status'] ?? '');
-if ($status !== '' && !in_array($status, entry_statuses(), true)) {
+if (!in_array($status, entry_filter_statuses(), true)) {
+    $status = '';
+}
+$trash_supported = entry_trash_supported();
+if (($status === 'trash' && !$trash_supported) || (!$can_write && $status === 'trash')) {
     $status = '';
 }
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $result = get_entries($ct_id, $status, $page, 20);
 $fields = get_fields($ct_id);
+$counts = count_entries_by_status($ct_id);
+$all_count = (int) ($counts['draft'] ?? 0) + (int) ($counts['published'] ?? 0) + (int) ($counts['archived'] ?? 0);
+
+$tabs = [
+    '' => ['label' => 'Semua', 'count' => $all_count],
+    'published' => ['label' => 'Published', 'count' => (int) ($counts['published'] ?? 0)],
+    'draft' => ['label' => 'Draft', 'count' => (int) ($counts['draft'] ?? 0)],
+];
+if ($can_write) {
+    if ($trash_supported) {
+        $tabs['trash'] = ['label' => 'Trash', 'count' => (int) ($counts['trash'] ?? 0)];
+    }
+}
 
 echo '<p class="muted">Content Type: <strong>' . e($ct['label']) . '</strong> (<code>' . e($ct['slug']) . '</code>)</p>';
 if ($can_write) {
     echo '<div class="page-actions"><a class="btn btn-primary" href="' . e(admin_url('entries/create?content_type=' . $ct_id)) . '">+ Tambah Entri</a></div>';
 }
 
-echo '<div class="filters">';
-$status_links = ['' => 'Semua', 'draft' => 'Draft', 'published' => 'Published', 'archived' => 'Archived'];
-foreach ($status_links as $key => $label) {
+echo '<nav class="tabs">';
+foreach ($tabs as $key => $tab) {
     $url = admin_url('entries?content_type=' . $ct_id . ($key !== '' ? '&status=' . $key : ''));
-    $cls = $status === $key ? 'btn btn-small active' : 'btn btn-small';
-    echo '<a class="' . $cls . '" href="' . e($url) . '">' . $label . '</a> ';
+    echo '<a class="tab' . ($status === $key ? ' active' : '') . '" href="' . e($url) . '">'
+        . e($tab['label']) . ' <span class="tab-count">' . (int) $tab['count'] . '</span></a>';
 }
-echo '</div>';
+echo '</nav>';
+
+$bulk_open = $can_write && $result['items'] !== [];
+if ($bulk_open) {
+    echo '<form method="post" action="' . e(admin_url('entries/bulk')) . '" data-bulk id="entries-bulk">'
+        . csrf_field()
+        . '<input type="hidden" name="content_type" value="' . $ct_id . '">'
+        . '<input type="hidden" name="return_status" value="' . e($status) . '">'
+        . '<input type="hidden" name="return_page" value="' . $page . '">';
+    echo '<div class="bulk-bar">'
+        . '<label class="checkbox-inline"><input type="checkbox" data-check-all> Pilih semua</label>'
+        . '<select name="bulk_action" aria-label="Aksi massal">'
+        . '<option value="">— Pilih aksi —</option>'
+        . '<option value="draft">Set status: Draft</option>'
+        . '<option value="published">Set status: Published</option>'
+        . '<option value="trash">Buang ke Trash</option>'
+        . '<option value="restore">Pulihkan dari Trash</option>'
+        . '<option value="delete">Hapus permanen</option>'
+        . '</select>'
+        . '<button type="submit" class="btn btn-small">Terapkan</button>'
+        . '</div>';
+}
 
 if ($result['items'] === []) {
-    echo '<p class="muted">Tidak ada entri.</p>';
+    echo '<p class="muted">Tidak ada entri pada tab ini.</p>';
 } else {
-    echo '<table class="table"><thead><tr><th>ID</th><th>Preview</th><th>Status</th><th>Diperbarui</th><th></th></tr></thead><tbody>';
+    echo '<table class="table"><thead><tr>';
+    if ($can_write) {
+        echo '<th class="col-check"></th>';
+    }
+    echo '<th>ID</th><th>Preview</th><th>Status</th><th>Diperbarui</th><th></th></tr></thead><tbody>';
     foreach ($result['items'] as $entry) {
+        $entry_id = (int) $entry['id'];
+        $is_trash = entry_is_trashed($entry);
         $actions = '';
         if ($can_write) {
-            $actions .= '<a class="btn btn-small" href="' . e(admin_url('entries/edit?id=' . (int) $entry['id'] . '&content_type=' . $ct_id)) . '">Edit</a> ';
-            $actions .= '<form method="post" action="' . e(admin_url('entries/delete')) . '" data-confirm="Hapus entri #' . (int) $entry['id'] . '?" class="inline-form">'
-                . csrf_field()
-                . '<input type="hidden" name="id" value="' . (int) $entry['id'] . '">'
-                . '<input type="hidden" name="content_type" value="' . $ct_id . '">'
-                . '<button type="submit" class="btn btn-small btn-danger">Hapus</button></form>';
+            if (!$is_trash) {
+                $actions .= '<a class="btn btn-small" href="' . e(admin_url('entries/edit?id=' . $entry_id . '&content_type=' . $ct_id)) . '">Edit</a> ';
+                $actions .= '<button type="submit" form="entry-row-' . $entry_id . '" name="bulk_action" value="trash" class="btn btn-small"'
+                    . ' data-confirm="Buang entri #' . $entry_id . ' ke Trash?">Buang</button> ';
+                $actions .= '<button type="submit" form="entry-row-' . $entry_id . '" name="bulk_action" value="delete" class="btn btn-small btn-danger"'
+                    . ' data-confirm="Hapus permanen entri #' . $entry_id . '? Tindakan ini tidak bisa dibatalkan.">Hapus</button>';
+            } else {
+                $actions .= '<button type="submit" form="entry-row-' . $entry_id . '" name="bulk_action" value="restore" class="btn btn-small">Pulihkan</button> ';
+                $actions .= '<button type="submit" form="entry-row-' . $entry_id . '" name="bulk_action" value="delete" class="btn btn-small btn-danger"'
+                    . ' data-confirm="Hapus permanen entri #' . $entry_id . '? Tindakan ini tidak bisa dibatalkan.">Hapus permanen</button>';
+            }
         }
-        echo '<tr>'
-            . '<td>#' . (int) $entry['id'] . '</td>'
+        echo '<tr>';
+        if ($can_write) {
+            echo '<td class="col-check"><input type="checkbox" name="ids[]" value="' . $entry_id . '" aria-label="Pilih entri #' . $entry_id . '"></td>';
+        }
+        echo '<td>#' . $entry_id . '</td>'
             . '<td>' . entry_preview($entry, $fields) . '</td>'
             . '<td>' . status_badge($entry['status']) . '</td>'
             . '<td>' . e($entry['updated_at']) . '</td>'
             . '<td class="actions">' . $actions . '</td></tr>';
     }
     echo '</tbody></table>';
+}
+
+if ($bulk_open) {
+    echo '</form>';
+}
+
+if ($result['items'] !== []) {
     echo render_pagination(admin_url('entries'), $result['page'], $result['total_pages'], ['content_type' => $ct_id, 'status' => $status]);
+}
+
+// Form tersembunyi untuk aksi per baris (tombol memakai atribut form=...).
+if ($can_write) {
+    foreach ($result['items'] as $entry) {
+        $entry_id = (int) $entry['id'];
+        echo '<form id="entry-row-' . $entry_id . '" method="post" action="' . e(admin_url('entries/bulk')) . '" class="row-action-form">'
+            . csrf_field()
+            . '<input type="hidden" name="content_type" value="' . $ct_id . '">'
+            . '<input type="hidden" name="return_status" value="' . e($status) . '">'
+            . '<input type="hidden" name="return_page" value="' . $page . '">'
+            . '<input type="hidden" name="ids[]" value="' . $entry_id . '">'
+            . '</form>';
+    }
 }
 
 admin_footer();

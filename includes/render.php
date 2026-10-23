@@ -174,7 +174,7 @@ function entry_preview(array $entry, array $fields, int $count = 2): string
 
 function status_badge(string $status): string
 {
-    $class = in_array($status, ['draft', 'published', 'archived'], true) ? $status : '';
+    $class = in_array($status, ['draft', 'published', 'archived', 'trash'], true) ? $status : '';
     return '<span class="badge ' . e($class) . '">' . e($status) . '</span>';
 }
 

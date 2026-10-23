@@ -14,6 +14,7 @@ require_once dirname(__DIR__, 2) . '/includes/content_entries.php';
 require_once dirname(__DIR__, 2) . '/includes/upload.php';
 require_once dirname(__DIR__, 2) . '/includes/audit_log.php';
 require_once dirname(__DIR__, 2) . '/includes/taxonomies.php';
+require_once dirname(__DIR__, 2) . '/includes/webhooks.php';
 
 $ct = get_content_type_by_slug($slug);
 if ($ct === null || !(int) $ct['is_api_enabled']) {
@@ -168,7 +169,7 @@ function handle_api_get(array $ct, ?int $id): void
 {
     if ($id !== null) {
         $entry = get_entry_for_content_type($id, (int) $ct['id']);
-        if ($entry === null) {
+        if ($entry === null || entry_is_trashed($entry)) {
             json_error('not_found', 'Entry tidak ditemukan.', 404);
         }
         json_response(['success' => true, 'data' => api_entry_payload($entry)]);
@@ -230,6 +231,9 @@ function handle_api_post(array $ct): void
     $entry_id = create_entry((int) $ct['id'], $result['data'], $status, $GLOBALS['api_user_id'] ?? null);
     set_entry_terms($entry_id, $all_term_ids);
     log_audit('api_create_entry', 'content_entries', (string) $entry_id, $GLOBALS['api_user_id'] ?? null);
+    if ($status === 'published') {
+        webhook_queue_event('entry.published', $ct, $entry_id, null, ['status' => 'published', 'via' => 'api']);
+    }
     json_response(['success' => true, 'data' => ['id' => $entry_id]], 201);
 }
 
@@ -239,7 +243,7 @@ function handle_api_put(array $ct, ?int $id, bool $partial): void
         json_error('validation_error', 'ID entry wajib ada di URL.', 400);
     }
     $entry = get_entry_for_content_type($id, (int) $ct['id']);
-    if ($entry === null) {
+    if ($entry === null || entry_is_trashed($entry)) {
         json_error('not_found', 'Entry tidak ditemukan.', 404);
     }
 
@@ -272,6 +276,18 @@ function handle_api_put(array $ct, ?int $id, bool $partial): void
         set_entry_terms($id, api_resolve_terms($body, $ct));
     }
     log_audit('api_update_entry', 'content_entries', (string) $id, $GLOBALS['api_user_id'] ?? null);
+    $old_status = (string) $entry['status'];
+    if ($status === 'published') {
+        webhook_queue_event(
+            $old_status === 'published' ? 'entry.updated' : 'entry.published',
+            $ct,
+            $id,
+            null,
+            ['status' => 'published', 'via' => 'api']
+        );
+    } elseif ($old_status === 'published') {
+        webhook_queue_event('entry.unpublished', $ct, $id, null, ['status' => $status, 'via' => 'api']);
+    }
     json_response(['success' => true, 'data' => ['id' => $id]]);
 }
 
@@ -281,10 +297,13 @@ function handle_api_delete(array $ct, ?int $id): void
         json_error('validation_error', 'ID entry wajib ada di URL.', 400);
     }
     $entry = get_entry_for_content_type($id, (int) $ct['id']);
-    if ($entry === null) {
+    if ($entry === null || entry_is_trashed($entry)) {
         json_error('not_found', 'Entry tidak ditemukan.', 404);
     }
 
+    if (($entry['status'] ?? '') === 'published') {
+        webhook_queue_event('entry.deleted', $ct, $id, null, ['status' => 'published', 'via' => 'api']);
+    }
     delete_entry($id);
     log_audit('api_delete_entry', 'content_entries', (string) $id, $GLOBALS['api_user_id'] ?? null);
     json_response(['success' => true, 'data' => ['id' => $id]]);

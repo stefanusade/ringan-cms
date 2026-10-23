@@ -26,7 +26,7 @@ $user = require_login();
 $db = get_db();
 $stats = [
     'content_types' => count_content_types(),
-    'entries' => (int) $db->query('SELECT COUNT(*) FROM content_entries')->fetchColumn(),
+    'entries' => (int) $db->query("SELECT COUNT(*) FROM content_entries WHERE status <> 'trash'")->fetchColumn(),
     'entries_published' => (int) $db->query("SELECT COUNT(*) FROM content_entries WHERE status = 'published'")->fetchColumn(),
     'users' => (int) $db->query('SELECT COUNT(*) FROM users')->fetchColumn(),
     'api_keys' => (int) $db->query('SELECT COUNT(*) FROM api_keys WHERE is_active = 1')->fetchColumn(),
@@ -36,6 +36,7 @@ $recent = $db->query(
     'SELECT ce.*, ct.label AS content_type_label, ct.slug AS content_type_slug
      FROM content_entries ce
      JOIN content_types ct ON ct.id = ce.content_type_id
+     WHERE ce.status <> \'trash\'
      ORDER BY ce.updated_at DESC
      LIMIT 10'
 )->fetchAll();

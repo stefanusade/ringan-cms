@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS content_type_fields (
 CREATE TABLE IF NOT EXISTS content_entries (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   content_type_id INT UNSIGNED NOT NULL,
-  status ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
+  status ENUM('draft','published','archived','trash') NOT NULL DEFAULT 'draft',
   data JSON NOT NULL,
   created_by INT UNSIGNED NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -185,4 +185,21 @@ CREATE TABLE IF NOT EXISTS import_refs (
   KEY idx_import_entry (entry_id),
   CONSTRAINT fk_import_entry FOREIGN KEY (entry_id) REFERENCES content_entries(id) ON DELETE CASCADE,
   CONSTRAINT fk_import_ct FOREIGN KEY (content_type_id) REFERENCES content_types(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Antrean webhook keluar (rebuild SSG). Dikirim setelah response selesai.
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  event VARCHAR(50) NOT NULL,
+  url VARCHAR(500) NOT NULL,
+  payload MEDIUMTEXT NOT NULL,
+  status ENUM('pending','sending','delivered','failed') NOT NULL DEFAULT 'pending',
+  attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  response_code SMALLINT UNSIGNED NULL,
+  last_error VARCHAR(255) NULL,
+  available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  delivered_at DATETIME NULL,
+  KEY idx_wd_due (status, available_at),
+  KEY idx_wd_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

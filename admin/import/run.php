@@ -20,6 +20,7 @@ require_once APP_ROOT . '/includes/upload.php';
 require_once APP_ROOT . '/includes/taxonomies.php';
 require_once APP_ROOT . '/includes/audit_log.php';
 require_once APP_ROOT . '/includes/wordpress_import.php';
+require_once APP_ROOT . '/includes/webhooks.php';
 require_once APP_ROOT . '/admin/partials/header.php';
 require_once APP_ROOT . '/admin/partials/footer.php';
 
@@ -81,6 +82,14 @@ if ($action === 'batch') {
             (int) ($stats['failed'] ?? 0),
             (int) ($stats['downgraded'] ?? 0)
         ), 'import');
+        $imported = (int) ($stats['imported'] ?? 0);
+        $updated = (int) ($stats['updated'] ?? 0);
+        if ($imported + $updated > 0) {
+            webhook_queue_event('entries.imported', $ct, null, $user, [
+                'imported' => $imported,
+                'updated' => $updated,
+            ]);
+        }
     }
     redirect_admin('import/run?token=' . urlencode($token) . ($auto ? '&auto=1' : ''));
 }

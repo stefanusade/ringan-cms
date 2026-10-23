@@ -15,6 +15,7 @@ require_once APP_ROOT . '/includes/permissions.php';
 require_once APP_ROOT . '/includes/response.php';
 require_once APP_ROOT . '/includes/content_entries.php';
 require_once APP_ROOT . '/includes/audit_log.php';
+require_once APP_ROOT . '/includes/webhooks.php';
 
 $user = require_login();
 if (!can_write_entries($user)) {
@@ -38,5 +39,8 @@ if ($entry === null) {
 
 delete_entry($id);
 log_audit('delete_entry', 'content_entries', (string) $id, (int) $user['id']);
+if (($entry['status'] ?? '') === 'published') {
+    webhook_queue_event('entry.deleted', get_content_type($ct_id), $id, $user, ['status' => 'published', 'via' => 'admin']);
+}
 flash_set('success', 'Entri #' . $id . ' dihapus.');
 redirect_admin('entries?content_type=' . $ct_id);

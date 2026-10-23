@@ -69,6 +69,52 @@
       });
     });
 
+    // ===== Bulk entri: pilih semua & konfirmasi =====
+    var checkAll = document.querySelector('[data-check-all]');
+    if (checkAll) {
+      checkAll.addEventListener('change', function () {
+        document.querySelectorAll('input[name="ids[]"]').forEach(function (cb) {
+          cb.checked = checkAll.checked;
+        });
+      });
+    }
+
+    document.querySelectorAll('button[data-confirm]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        if (!window.confirm(btn.dataset.confirm || 'Yakin?')) {
+          e.preventDefault();
+        }
+      });
+    });
+
+    var bulkForm = document.querySelector('form[data-bulk]');
+    if (bulkForm) {
+      bulkForm.addEventListener('submit', function (e) {
+        var checked = bulkForm.querySelectorAll('input[name="ids[]"]:checked');
+        if (checked.length === 0) {
+          e.preventDefault();
+          window.alert('Pilih minimal satu entri.');
+          return;
+        }
+        var select = bulkForm.querySelector('select[name="bulk_action"]');
+        var action = select ? select.value : '';
+        if (!action) {
+          e.preventDefault();
+          window.alert('Pilih aksi massal terlebih dahulu.');
+          return;
+        }
+        var message = '';
+        if (action === 'delete') {
+          message = 'Hapus permanen ' + checked.length + ' entri? Tindakan ini tidak bisa dibatalkan.';
+        } else if (action === 'trash') {
+          message = 'Buang ' + checked.length + ' entri ke Trash?';
+        }
+        if (message && !window.confirm(message)) {
+          e.preventDefault();
+        }
+      });
+    }
+
     // ===== Sidebar hide/show (mobile-friendly) =====
     var sidebar = document.getElementById('sidebar');
     var toggleBtn = document.getElementById('sidebar-toggle');

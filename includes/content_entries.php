@@ -15,6 +15,38 @@ function entry_statuses(): array
 }
 
 /**
+ * Status yang boleh dipakai untuk filter admin, termasuk trash (soft delete).
+ */
+function entry_filter_statuses(): array
+{
+    return array_merge(entry_statuses(), ['trash']);
+}
+
+function entry_is_trashed(array $entry): bool
+{
+    return (string) ($entry['status'] ?? '') === 'trash';
+}
+
+/**
+ * Apakah kolom status sudah mendukung 'trash' (migrasi 009 diterapkan)?
+ */
+function entry_trash_supported(): bool
+{
+    static $supported = null;
+    if ($supported !== null) {
+        return $supported;
+    }
+    try {
+        $stmt = get_db()->query("SHOW COLUMNS FROM content_entries LIKE 'status'");
+        $column = $stmt->fetch();
+        $supported = is_array($column) && str_contains((string) ($column['Type'] ?? ''), "'trash'");
+    } catch (Throwable $e) {
+        $supported = false;
+    }
+    return $supported;
+}
+
+/**
  * CATATAN KEAMANAN: bagian dinamis query ($where/$sort_col/$order_dir) hanya
  * berasal dari whitelist internal di bawah — TIDAK pernah dari input user.
  * Semua nilai user melewati prepared statement.
@@ -26,12 +58,21 @@ function get_entries(int $content_type_id, string $status = '', int $page = 1, i
     $page = max(1, $page);
     $sort_col = in_array($sort, ['id', 'created_at', 'updated_at'], true) ? $sort : 'created_at';
     $order_dir = strtoupper($order) === 'ASC' ? 'ASC' : 'DESC';
+    if (!in_array($status, entry_filter_statuses(), true)) {
+        $status = '';
+    }
+    if ($status === 'trash' && !entry_trash_supported()) {
+        $status = '';
+    }
 
     $where = 'WHERE ce.content_type_id = ?';
     $params = [$content_type_id];
-    if ($status !== '' && in_array($status, entry_statuses(), true)) {
+    if ($status !== '') {
         $where .= ' AND ce.status = ?';
         $params[] = $status;
+    } else {
+        // "Semua" tidak menampilkan entri yang sudah dibuang ke Trash.
+        $where .= " AND ce.status <> 'trash'";
     }
     // Filter per term (taksonomi): ce.id harus ada di mapping term tsb.
     if ($filter_taxonomy_id !== null && $filter_term_slug !== null && $filter_term_slug !== '') {
@@ -119,6 +160,43 @@ function delete_entry(int $id): void
     $stmt->execute([$id]);
 }
 
+function set_entry_status(int $id, string $status): void
+{
+    if (!in_array($status, entry_filter_statuses(), true)) {
+        throw new InvalidArgumentException('Status entri tidak valid.');
+    }
+    $stmt = get_db()->prepare('UPDATE content_entries SET status = ? WHERE id = ?');
+    $stmt->execute([$status, $id]);
+}
+
+function trash_entry(int $id): void
+{
+    set_entry_status($id, 'trash');
+}
+
+function restore_entry(int $id): void
+{
+    set_entry_status($id, 'draft');
+}
+
+/**
+ * Jumlah entri per status untuk tab daftar entri.
+ *
+ * @return array<string,int>
+ */
+function count_entries_by_status(int $content_type_id): array
+{
+    $stmt = get_db()->prepare(
+        'SELECT status, COUNT(*) AS total FROM content_entries WHERE content_type_id = ? GROUP BY status'
+    );
+    $stmt->execute([$content_type_id]);
+    $counts = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $counts[(string) $row['status']] = (int) $row['total'];
+    }
+    return $counts;
+}
+
 function decode_entry_data(array $entry): array
 {
     $decoded = json_decode($entry['data'] ?? '{}', true);
@@ -167,7 +245,7 @@ function validate_entry_payload(array $payload, array $fields, bool $partial = f
             } else {
                 $ids = (array) $value;
                 $placeholders = implode(',', array_fill(0, count($ids), '?'));
-                $stmt = get_db()->prepare("SELECT COUNT(*) FROM content_entries WHERE content_type_id = ? AND id IN ($placeholders)");
+                $stmt = get_db()->prepare("SELECT COUNT(*) FROM content_entries WHERE content_type_id = ? AND status <> 'trash' AND id IN ($placeholders)");
                 $stmt->execute(array_merge([(int) $target['id']], $ids));
                 if ((int) $stmt->fetchColumn() !== count($ids)) {
                     $field_errors[] = 'Satu atau lebih entry relasi tidak ditemukan.';

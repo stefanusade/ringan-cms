@@ -82,6 +82,7 @@ function admin_menu_items(array $user, string $active = ''): array
             'children' => [
                 ['label' => 'General', 'url' => admin_url('settings'), 'active' => $active === 'settings'],
                 ['label' => 'Media', 'url' => admin_url('settings/media'), 'active' => $active === 'settings-media'],
+                ['label' => 'Webhooks', 'url' => admin_url('settings/webhooks'), 'active' => $active === 'settings-webhooks'],
                 ['label' => 'API Keys', 'url' => admin_url('api-keys'), 'active' => $active === 'api-keys'],
             ],
         ];

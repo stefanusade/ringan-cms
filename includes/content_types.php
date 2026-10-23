@@ -30,7 +30,7 @@ function get_content_types(): array
     $db = get_db();
     $stmt = $db->query(
         'SELECT ct.*,
-                (SELECT COUNT(*) FROM content_entries ce WHERE ce.content_type_id = ct.id) AS entry_count,
+                (SELECT COUNT(*) FROM content_entries ce WHERE ce.content_type_id = ct.id AND ce.status <> \'trash\') AS entry_count,
                 (SELECT COUNT(*) FROM content_type_fields f WHERE f.content_type_id = ct.id) AS field_count
          FROM content_types ct
          ORDER BY ct.created_at DESC, ct.id DESC'
