@@ -233,7 +233,12 @@ function validate_entry_payload(array $payload, array $fields, bool $partial = f
         }
         $raw = $has ? $payload[$key] : null;
         $field_errors = [];
-        $value = validate_field_value($field, $raw, $field_errors, $enforce_required);
+        // Sertakan options hasil decode agar batasan field (max_length, min/max,
+        // daftar pilihan select) benar-benar ditegakkan saat validasi.
+        $field_with_options = array_merge($field, [
+            'options' => decode_options($field['options_json'] ?? null),
+        ]);
+        $value = validate_field_value($field_with_options, $raw, $field_errors, $enforce_required);
 
         // validasi relasi: target harus eksis
         if (($field['field_type'] ?? '') === 'relation' && $value !== null) {
@@ -261,6 +266,59 @@ function validate_entry_payload(array $payload, array $fields, bool $partial = f
     }
 
     return ['ok' => $errors === [], 'data' => $clean, 'errors' => $errors];
+}
+
+/**
+ * Tipe field yang boleh diedit lewat Quick Edit di tabel entri.
+ * Sengaja dibatasi ke field ringan (tanpa upload/relasi/HTML) agar aman & cepat.
+ */
+function entry_quick_edit_field_types(): array
+{
+    return ['text', 'date'];
+}
+
+/**
+ * Filter definisi field menjadi hanya field yang bisa diedit via Quick Edit.
+ */
+function entry_quick_edit_fields(array $fields): array
+{
+    $allowed = entry_quick_edit_field_types();
+    return array_values(array_filter(
+        $fields,
+        static fn(array $field): bool => in_array($field['field_type'] ?? '', $allowed, true)
+    ));
+}
+
+/**
+ * Simpan perubahan Quick Edit: hanya field text/date yang diproses, field lain
+ * dan status entri dibiarkan apa adanya (partial update, anti mass-assignment).
+ *
+ * @return array{ok:bool,errors:array<string,string[]>}
+ */
+function update_entry_quick_fields(array $entry, array $fields, array $payload): array
+{
+    $quick_fields = entry_quick_edit_fields($fields);
+    $editable_keys = array_column($quick_fields, 'field_key');
+
+    $submitted = [];
+    foreach ($payload as $key => $value) {
+        if (in_array((string) $key, $editable_keys, true)) {
+            $submitted[(string) $key] = $value;
+        }
+    }
+
+    // Field wajib hanya dicek saat entri bukan draft (konsisten dengan form edit).
+    $status = (string) ($entry['status'] ?? 'draft');
+    $enforce_required = !in_array($status, ['draft', 'trash'], true);
+
+    $result = validate_entry_payload($submitted, $quick_fields, true, $enforce_required);
+    if (!$result['ok']) {
+        return ['ok' => false, 'errors' => $result['errors']];
+    }
+
+    $data = array_merge(decode_entry_data($entry), $result['data']);
+    update_entry((int) $entry['id'], $data, $status);
+    return ['ok' => true, 'errors' => []];
 }
 
 /**

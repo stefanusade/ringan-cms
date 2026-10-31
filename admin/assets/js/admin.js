@@ -115,6 +115,55 @@
       });
     }
 
+    // ===== Quick Edit: expand/collapse baris entri =====
+    function setQuickEdit(rowId, open) {
+      var row = document.getElementById(rowId);
+      if (!row || !row.classList.contains('quick-edit-row')) {
+        return;
+      }
+      row.hidden = !open;
+      document.querySelectorAll('[data-quick-edit-toggle="' + rowId + '"]').forEach(function (btn) {
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      if (open) {
+        var first = row.querySelector('input:not([type="hidden"]), select');
+        if (first) {
+          first.focus({ preventScroll: true });
+          if (row.scrollIntoView) {
+            row.scrollIntoView({ block: 'nearest' });
+          }
+        }
+      }
+    }
+
+    document.addEventListener('click', function (e) {
+      var toggle = e.target.closest('[data-quick-edit-toggle]');
+      if (toggle) {
+        var rowId = toggle.dataset.quickEditToggle || '';
+        var row = document.getElementById(rowId);
+        setQuickEdit(rowId, !row || row.hidden);
+        return;
+      }
+      var close = e.target.closest('[data-quick-edit-close]');
+      if (close) {
+        setQuickEdit(close.dataset.quickEditClose || '', false);
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') {
+        return;
+      }
+      document.querySelectorAll('.quick-edit-row:not([hidden])').forEach(function (row) {
+        setQuickEdit(row.id, false);
+      });
+    });
+
+    // Setelah simpan/gagal simpan, redirect membawa #entry-N → buka baris itu.
+    if (/^#entry-\d+$/.test(window.location.hash)) {
+      setQuickEdit(window.location.hash.slice(1), true);
+    }
+
     // ===== Sidebar hide/show (mobile-friendly) =====
     var sidebar = document.getElementById('sidebar');
     var toggleBtn = document.getElementById('sidebar-toggle');

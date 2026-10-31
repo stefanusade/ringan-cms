@@ -260,6 +260,31 @@ function entry_terms_map(int $entry_id): array
     return $map;
 }
 
+/**
+ * Pemetaan term per entri sekaligus: [entry_id][taxonomy_id] => [term_id].
+ * Dipakai agar tabel entri tidak melakukan satu query per baris.
+ */
+function get_entry_terms_map_bulk(array $entry_ids): array
+{
+    $entry_ids = array_values(array_unique(array_filter(array_map('intval', $entry_ids), static fn(int $id): bool => $id > 0)));
+    if ($entry_ids === []) {
+        return [];
+    }
+    $placeholders = implode(',', array_fill(0, count($entry_ids), '?'));
+    $stmt = get_db()->prepare(
+        "SELECT et.entry_id, t.taxonomy_id, et.term_id
+         FROM entry_terms et
+         JOIN terms t ON t.id = et.term_id
+         WHERE et.entry_id IN ($placeholders)"
+    );
+    $stmt->execute($entry_ids);
+    $map = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $map[(int) $row['entry_id']][(int) $row['taxonomy_id']][] = (int) $row['term_id'];
+    }
+    return $map;
+}
+
 function get_taxonomies_with_terms(int $content_type_id): array
 {
     $result = [];

@@ -95,6 +95,25 @@ function render_field_input(array $field, mixed $value = null): string
     }
 }
 
+/**
+ * Input ringkas untuk Quick Edit (text/date) dengan id unik per baris tabel.
+ * Input dikaitkan ke form lewat atribut form=... karena form-nya berada di luar
+ * <table> (menghindari form bersarang dengan form aksi massal).
+ */
+function render_quick_edit_input(array $field, mixed $value, string $id_prefix, string $form_id): string
+{
+    $key = (string) $field['field_key'];
+    $options = decode_options($field['options_json'] ?? null);
+    $attr = 'name="' . e('data[' . $key . ']') . '" id="' . e($id_prefix . '_' . $key) . '"'
+        . ' form="' . e($form_id) . '"';
+
+    if (($field['field_type'] ?? 'text') === 'date') {
+        return '<input type="date" ' . $attr . ' value="' . e((string) ($value ?? '')) . '">';
+    }
+    $max = (int) ($options['max_length'] ?? 255);
+    return '<input type="text" ' . $attr . ' value="' . e((string) ($value ?? '')) . '" maxlength="' . $max . '">';
+}
+
 function render_field_file_input(array $field, mixed $value = null): string
 {
     $key = $field['field_key'];

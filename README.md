@@ -87,6 +87,11 @@ stat -c%s /tmp/ringan-cms.tar.gz       # harus < 1000000
   di tab Semua, dashboard, maupun API, tetapi datanya tetap tersimpan sampai
   dihapus permanen. Upgrade: jalankan migrasi
   `database/migrations/009_entry_trash.sql` (otomatis lewat menu Updates).
+- **Quick Edit di tabel entri** — setiap baris bisa di-expand untuk mengubah
+  field **teks single line**, **tanggal**, dan **taksonomi** langsung dari
+  daftar entri tanpa membuka form penuh. Field lain, status, dan isi rich
+  text/relasi tidak tersentuh; perubahan dicatat di audit log dan (bila entri
+  published) memicu webhook `entry.updated`.
 - **Taksonomi lintas content type** — kategori/tag/kustom yang bisa dipakai
   oleh banyak content type sekaligus (relasi many-to-many), hierarkis opsional;
   term dikelola di admin, entri bisa multi-term. API: filter

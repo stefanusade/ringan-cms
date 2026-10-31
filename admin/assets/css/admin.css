@@ -186,6 +186,23 @@ a:hover { text-decoration: underline; }
 .table th.col-check, .table td.col-check { width: 30px; text-align: center; }
 .row-action-form { display: none; }
 
+/* ===== Quick Edit (baris expand di tabel entri) ===== */
+.quick-edit-form { display: none; }
+.quick-edit-row > td { background: #f9fafb; }
+.quick-edit-inner { padding: 4px 2px; }
+.quick-edit-inner > strong { font-size: 0.95rem; }
+.quick-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 2px 16px;
+  margin: 12px 0 4px;
+}
+.quick-edit-grid .form-group { margin-bottom: 8px; }
+.quick-edit-tax { margin-bottom: 10px; }
+.quick-edit-tax > label { display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px; }
+.quick-edit-tax select { min-width: 220px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.quick-edit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 6px; }
 .form-group input[type="text"],
