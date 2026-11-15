@@ -65,9 +65,10 @@ stat -c%s /tmp/ringan-cms.tar.gz       # harus < 1000000
   unduh gambar/file ke media library, pemetaan kategori/tag, dan anti-duplikat
   (import ulang bisa memperbarui entri yang sama).
 - **Import ZIP + plugin Ringan Export** — plugin WordPress
-  (`wordpress-plugin/ringan-export/`) mengekspor post/CPT + seluruh field ACF +
-  media ke satu ZIP sesuai **profil JSON** dari CMS; admin cukup mengunggah ZIP
-  di **Tools → Import ZIP**. Lihat
+  [ringan-export](https://github.com/stefanusade/ringan-export) (repo terpisah)
+  mengekspor post/CPT + seluruh field ACF + media ke satu ZIP sesuai
+  **profil JSON** dari CMS; admin cukup mengunggah ZIP di
+  **Tools → Import ZIP**. Lihat
   [Import ZIP & plugin Ringan Export](#import-zip--plugin-ringan-export-wordpress).
 - **Profil ekspor per content type** — **Content Types → Profil** menyunting
   kontrak JSON (post type/status, pemetaan `post.*`/`acf.*`, transformasi,
@@ -205,8 +206,11 @@ api/v1/       REST API (bootstrap, router, handler content type, auth JWT)
 public/       webroot: index.php (front controller) + .htaccess
 database/     schema.sql + migrations/ + install.php
 storage/      uploads/ (di luar webroot) + logs/
-wordpress-plugin/ringan-export/  plugin WordPress (ekspor post+ACF+media ke ZIP)
 ```
+
+> Plugin WordPress **Ringan Export** (ekspor post + ACF + media ke ZIP) sekarang
+> berada di repo terpisah:
+> [stefanusade/ringan-export](https://github.com/stefanusade/ringan-export).
 
 ## API
 
@@ -454,8 +458,11 @@ media/<hash>.<ext>     # gambar/file yang dipakai entry
 
 ### Plugin WordPress `ringan-export`
 
-- Lokasi: `wordpress-plugin/ringan-export/` (salin ke `wp-content/plugins/`).
-  Butuh WordPress 6.0+, PHP 8.0+, dan `ZipArchive`; ACF opsional.
+Plugin berada di repo terpisah: **[stefanusade/ringan-export](https://github.com/stefanusade/ringan-export)**
+(unduh ZIP repo lalu salin folder `ringan-export` ke `wp-content/plugins/`, atau
+unggah lewat Plugins → Add New → Upload Plugin). Plugin butuh WordPress 6.0+,
+PHP 8.0+, dan `ZipArchive`; ACF opsional.
+
 - **Tools → Ringan Export**: tempel profil JSON atau ambil dari
   `/api/v1/{slug}/profile` (boleh menyertakan `X-API-Key`), pilih post type dan
   status, lalu **Mulai Ekspor**.

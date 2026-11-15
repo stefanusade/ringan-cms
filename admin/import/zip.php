@@ -210,6 +210,9 @@ admin_header('Import ZIP WordPress', 'import-zip');
     <li>Hanya <code>manifest.json</code> dan <code>media/*</code> yang diterima; file lain di ZIP ditolak.</li>
     <li>Media divalidasi ulang dengan <code>finfo</code>; tipe yang tidak diizinkan CMS akan dilewati.</li>
     <li>Buat profil di <strong>Content Types → Profil</strong> lalu salin ke plugin WordPress.</li>
+    <li>Plugin-nya ada di repo terpisah:
+      <a href="https://github.com/stefanusade/ringan-export" target="_blank" rel="noopener noreferrer">stefanusade/ringan-export</a>
+      (WP 6.0+, PHP 8.0+, <code>ZipArchive</code>).</li>
   </ul>
   <form method="post" action="<?= e(admin_url('import/zip')) ?>" enctype="multipart/form-data">
     <?= csrf_field() ?>
