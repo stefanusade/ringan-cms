@@ -466,8 +466,17 @@ unggah lewat Plugins → Add New → Upload Plugin (atau salin folder
 PHP 8.0+, dan `ZipArchive`; ACF opsional.
 
 - **Tools → Ringan Export**: tempel profil JSON atau ambil dari
-  `/api/v1/{slug}/profile` (boleh menyertakan `X-API-Key`), pilih post type dan
-  status, lalu **Mulai Ekspor**.
+  `/api/v1/{slug}/profile` (boleh menyertakan `X-API-Key`). Sejak plugin 1.1.0
+  setiap field CMS dipetakan otomatis ke field ACF/`post.*` yang benar dan
+  ditampilkan di tabel **Pemetaan field** (bisa diubah manual); tombol
+  **Pratinjau 1 post** memperlihatkan entry hasil pemetaan + pembersihan sebelum
+  ekspor penuh. Pilih post type dan status, lalu **Mulai Ekspor**.
+- Konten dibersihkan sebelum masuk ZIP: penanda blok Gutenberg, shortcode,
+  atribut tema (`class`, `style`, `srcset`, `data-*`), `<iframe>` (menjadi
+  tautan), tag kosong, dan URL relatif diabsolutkan agar gambar di konten ikut
+  menjadi media. Tiap langkah bisa dimatikan lewat opsi di kartu pemetaan.
+- Nilai setiap field divalidasi terhadap tipe field CMS sebelum ditulis, jadi
+  Import ZIP tidak menolak seluruh arsip karena satu nilai yang salah tipe.
 - Ekspor bertahap (20 post per request, maksimal 5000 post dan 19000 media per
   ekspor — sama dengan batas Import ZIP) menulis entry ke file sementara, lalu
   tahap akhir menambahkan media + `manifest.json` dan menyiapkan tautan unduh.
@@ -485,7 +494,8 @@ PHP 8.0+, dan `ZipArchive`; ACF opsional.
 
 1. Buat content type + field di CMS, lalu simpan profil di **Content Types →
    Profil**.
-2. Pasang plugin WordPress, tempel/ambil profil, ekspor ZIP.
+2. Pasang plugin WordPress, tempel/ambil profil, periksa tabel pemetaan +
+   pratinjau 1 post, lalu ekspor ZIP.
 3. **Tools → Import ZIP** di CMS, periksa pratinjau (jumlah entry/media,
    peringatan), jalankan import.
 4. Bila ada relasi antar content type, impor content type target lebih dulu.
