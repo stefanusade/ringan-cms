@@ -458,9 +458,11 @@ media/<hash>.<ext>     # gambar/file yang dipakai entry
 
 ### Plugin WordPress `ringan-export`
 
-Plugin berada di repo terpisah: **[stefanusade/ringan-export](https://github.com/stefanusade/ringan-export)**
-(unduh ZIP repo lalu salin folder `ringan-export` ke `wp-content/plugins/`, atau
-unggah lewat Plugins → Add New → Upload Plugin). Plugin butuh WordPress 6.0+,
+Plugin berada di repo terpisah: **[stefanusade/ringan-export](https://github.com/stefanusade/ringan-export)**.
+Unduh `ringan-export-<versi>.zip` dari
+[halaman Releases](https://github.com/stefanusade/ringan-export/releases) lalu
+unggah lewat Plugins → Add New → Upload Plugin (atau salin folder
+`ringan-export` ke `wp-content/plugins/`). Plugin butuh WordPress 6.0+,
 PHP 8.0+, dan `ZipArchive`; ACF opsional.
 
 - **Tools → Ringan Export**: tempel profil JSON atau ambil dari
@@ -469,8 +471,9 @@ PHP 8.0+, dan `ZipArchive`; ACF opsional.
 - Ekspor bertahap (20 post per request, maksimal 5000 post dan 19000 media per
   ekspor — sama dengan batas Import ZIP) menulis entry ke file sementara, lalu
   tahap akhir menambahkan media + `manifest.json` dan menyiapkan tautan unduh.
-  File sementara dihapus setelah ZIP diunduh/dibatalkan dan otomatis
-  dibersihkan setelah 24 jam.
+  ZIP disusun ke file `.part` lalu dipindahkan setelah verifikasi, dan tetap
+  tersedia 6 jam agar bisa diunduh ulang; file sementara dibersihkan setelah
+  24 jam.
 - Media hanya diambil dari folder uploads WordPress (tidak ada fetch URL
   eksternal), dengan batas ukuran dari profil (`media_max_bytes`) dan whitelist
   MIME yang sama seperti CMS.
