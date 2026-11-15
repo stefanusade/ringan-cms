@@ -267,6 +267,10 @@ admin_header('Import WordPress', 'import');
     mapping diverifikasi.
   </p>
   <?= render_errors($errors) ?>
+  <p class="hint">
+    Punya ZIP hasil plugin <strong>Ringan Export</strong> (post + ACF + media dalam satu file)?
+    Gunakan <a href="<?= e(admin_url('import/zip')) ?>">Import ZIP</a>.
+  </p>
   <?php if (!wp_import_refs_available()): ?>
     <div class="alert alert-warning">
       Tabel <code>import_refs</code> belum tersedia (jalankan migrasi

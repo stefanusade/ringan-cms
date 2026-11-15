@@ -95,6 +95,7 @@ function admin_menu_items(array $user, string $active = ''): array
             'url' => admin_url('tools'),
             'children' => [
                 ['label' => 'WordPress Import', 'url' => admin_url('import'), 'active' => $active === 'import'],
+                ['label' => 'Import ZIP', 'url' => admin_url('import/zip'), 'active' => $active === 'import-zip'],
             ],
         ];
     }

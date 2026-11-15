@@ -47,9 +47,12 @@ if ($slug === 'site') {
 }
 
 $taxonomies_request = false;
+$profile_request = false;
 if (isset($segments[1])) {
     if ($segments[1] === 'taxonomies' && count($segments) === 2) {
         $taxonomies_request = true;
+    } elseif ($segments[1] === 'profile' && count($segments) === 2) {
+        $profile_request = true;
     } elseif (!ctype_digit($segments[1])) {
         json_error('not_found', 'Endpoint tidak ditemukan.', 404);
     } else {

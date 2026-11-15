@@ -49,6 +49,7 @@ admin_header('Content Types', 'content-types');
         <a class="btn btn-small" href="<?= e(admin_url('entries?content_type=' . (int) $ct['id'])) ?>">Entries</a>
         <a class="btn btn-small" href="<?= e(admin_url('content-types/fields?content_type=' . (int) $ct['id'])) ?>">Fields</a>
         <a class="btn btn-small" href="<?= e(admin_url('taxonomies?content_type=' . (int) $ct['id'])) ?>">Taxonomies</a>
+        <a class="btn btn-small" href="<?= e(admin_url('content-types/profile?content_type=' . (int) $ct['id'])) ?>">Profil</a>
         <a class="btn btn-small" href="<?= e(admin_url('content-types/edit?id=' . (int) $ct['id'])) ?>">Edit</a>
         <form method="post" action="<?= e(admin_url('content-types/delete')) ?>" data-confirm="Hapus content type <?= e($ct['label']) ?> beserta SEMUA field dan entri-nya?" class="inline-form">
           <?= csrf_field() ?>

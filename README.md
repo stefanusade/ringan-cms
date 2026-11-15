@@ -64,6 +64,15 @@ stat -c%s /tmp/ringan-cms.tar.gz       # harus < 1000000
   pilihan: pemetaan field otomatis/manual, verifikasi nilai sebelum eksekusi,
   unduh gambar/file ke media library, pemetaan kategori/tag, dan anti-duplikat
   (import ulang bisa memperbarui entri yang sama).
+- **Import ZIP + plugin Ringan Export** — plugin WordPress
+  (`wordpress-plugin/ringan-export/`) mengekspor post/CPT + seluruh field ACF +
+  media ke satu ZIP sesuai **profil JSON** dari CMS; admin cukup mengunggah ZIP
+  di **Tools → Import ZIP**. Lihat
+  [Import ZIP & plugin Ringan Export](#import-zip--plugin-ringan-export-wordpress).
+- **Profil ekspor per content type** — **Content Types → Profil** menyunting
+  kontrak JSON (post type/status, pemetaan `post.*`/`acf.*`, transformasi,
+  media, taksonomi) yang dibaca plugin WordPress. Profil juga tersedia via
+  `GET /api/v1/{slug}/profile` agar bisa diambil langsung oleh plugin.
 - **API key management** — key di-hash (SHA-256) saat disimpan, key asli hanya
   tampil sekali saat dibuat. Scope `read` / `read_write`, plus restriksi per
   content type (menu **Settings → API Keys**). Key bisa **diedit**
@@ -196,6 +205,7 @@ api/v1/       REST API (bootstrap, router, handler content type, auth JWT)
 public/       webroot: index.php (front controller) + .htaccess
 database/     schema.sql + migrations/ + install.php
 storage/      uploads/ (di luar webroot) + logs/
+wordpress-plugin/ringan-export/  plugin WordPress (ekspor post+ACF+media ke ZIP)
 ```
 
 ## API
@@ -236,6 +246,9 @@ curl "https://cms.example.com/api/v1/site"
 
 # Daftar taksonomi + term dari sebuah content type
 curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts/taxonomies"
+
+# Profil ekspor untuk plugin Ringan Export (read)
+curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts/profile"
 
 # List entri yang difilter per term
 curl -H "X-API-Key: rcm_xxx" "https://cms.example.com/api/v1/posts?tax=category&term=berita"
@@ -359,6 +372,114 @@ curl -X POST -H "X-API-Key: rcm_xxx" \
   dimuat per batch.
 - Parser WXR ditulis tanpa ekstensi XML: DOCTYPE/ENTITY ditolak, sehingga aman
   dari XXE dan tidak butuh `ext-simplexml`.
+
+## Import ZIP & plugin Ringan Export (WordPress)
+
+Alur yang disarankan untuk memindahkan WordPress (post/CPT + ACF + media) ke
+Ringan CMS tanpa server-to-server:
+
+```
+WordPress (plugin Ringan Export)                 Ringan CMS
+─────────────────────────────────                ──────────────────────────
+1. Content Types → Profil → unduh/copy JSON  ──▶  profil JSON per content type
+2. Tools → Ringan Export → tempel/ambil profil
+3. Pilih post type + status → Mulai Ekspor
+4. Unduh ZIP (manifest.json + media/*)       ──▶  5. Tools → Import ZIP
+                                                  6. Pratinjau → import bertahap
+```
+
+### Profil JSON per content type
+
+- Buka **Content Types → Profil** pada content type tujuan. CMS membuat profil
+  default dari definisi field: nama field yang sama otomatis dipetakan ke
+  `acf.<key>`, field `title`/`content`/`excerpt`/`slug`/`date` dikenali, dan
+  featured image dipakai untuk field gambar bernama `thumbnail`/`gambar`/`foto`.
+- Editor JSON memvalidasi seluruh isi profil: slug content type, tipe field,
+  sumber (`post.*`, `acf.*`, `none`), transformasi, `status_map`, taksonomi, dan
+  opsi media. Field yang belum tercantum ditambahkan otomatis dengan sumber
+  default (ditampilkan sebagai catatan setelah disimpan).
+- Profil disimpan di tabel `export_profiles`
+  (`database/migrations/011_export_profiles.sql`). Bila user DB tidak punya hak
+  DDL, CMS tetap membuat profil default on-the-fly; tombol simpan dinonaktifkan.
+- Tombol **Unduh JSON** menghasilkan profil efektif (tersimpan atau default).
+  Endpoint `GET /api/v1/{slug}/profile` (scope read) mengembalikan profil yang
+  sama sehingga plugin WordPress dapat mengambilnya langsung dengan `X-API-Key`.
+
+### Format ZIP `ringan-export`
+
+Isi ZIP hanya dua jenis file (yang lain ditolak saat analisis):
+
+```
+manifest.json          # format, profil, entries[], media{}
+media/<hash>.<ext>     # gambar/file yang dipakai entry
+```
+
+- Manifest: `format: "ringan-export"`, `format_version: 1`, `source`
+  (`site_url`, `site_name`, `post_type(s)`, `post_statuses`), `profile` (profil
+  CMS yang dipakai saat ekspor), `entries[]`
+  (`source_id`, `title`, `status`, `fields{}`, `terms[]`), dan `media{}`
+  (`rel → {name, mime, size}`).
+- `source_id` = ID post WordPress; dipakai `import_refs` untuk anti-duplikat
+  (lewati/perbarui).
+- Media di konten/richtext dikirim sebagai placeholder
+  `{{ringan_media:media/<hash>.<ext>}}`; CMS menggantinya menjadi URL
+  `BASE_URL/files/...` setelah file tersimpan.
+- Relasi ACF diekspor sebagai ID post sumber
+  (`{"__relation_source_ids":[...]}`); CMS mencocokkannya lewat `import_refs`.
+  Relasi yang belum diimpor dilewati dengan peringatan.
+
+### Halaman Import ZIP (CMS)
+
+- **Tools → Import ZIP** menerima ZIP (maks `ZIP_IMPORT_MAX_BYTES`, default
+  256 MB; `ZIP_IMPORT_MAX_TOTAL_BYTES` default 512 MB; `ZIP_IMPORT_MAX_FILE_BYTES`
+  default 10 MB), maksimal 5000 entry dan 20000 file per ZIP (manifest maks
+  16 MB). Butuh ekstensi PHP `ZipArchive`.
+- Analisis bersifat ketat: `manifest.json` wajib di root, setiap file non-manifest
+  harus terdaftar di `media{}`, direktori eksplisit ditolak, path divalidasi
+  (anti zip-slip), rasio kompresi > 200 untuk file > 1 MB ditolak (anti
+  zip-bomb), dan isi ZIP tidak diekstrak dengan `extractTo()`.
+- Content type tujuan harus sudah ada beserta field-nya; profil di dalam ZIP
+  divalidasi ulang terhadap definisi field saat ini (bila field berubah, ZIP
+  ditolak dengan pesan yang jelas).
+- Media divalidasi ulang dengan `finfo` dan whitelist MIME CMS
+  (`UPLOAD_MIME_MAP`), disimpan lewat `save_binary_upload()` (nama acak, di
+  `storage/uploads`, tanpa eksekusi PHP). Media yang MIME-nya tidak cocok
+  dilewati dengan peringatan; field terkait menjadi kosong.
+- Opsi import: lewati/perbarui/duplikat, simpan sebagai draft bila field wajib
+  belum lengkap, paksa draft, serta pemetaan kategori/tag (dengan opsi membuat
+  term baru). Import berjalan 20 entry per batch (opsi proses otomatis) dan
+  mencatat audit log + webhook `entries.imported`.
+- File kerja di `storage/tmp/import/zip/<token>` dibersihkan setelah 24 jam atau
+  saat sesi ditutup.
+
+### Plugin WordPress `ringan-export`
+
+- Lokasi: `wordpress-plugin/ringan-export/` (salin ke `wp-content/plugins/`).
+  Butuh WordPress 6.0+, PHP 8.0+, dan `ZipArchive`; ACF opsional.
+- **Tools → Ringan Export**: tempel profil JSON atau ambil dari
+  `/api/v1/{slug}/profile` (boleh menyertakan `X-API-Key`), pilih post type dan
+  status, lalu **Mulai Ekspor**.
+- Ekspor bertahap (20 post per request, maksimal 5000 post dan 19000 media per
+  ekspor — sama dengan batas Import ZIP) menulis entry ke file sementara, lalu
+  tahap akhir menambahkan media + `manifest.json` dan menyiapkan tautan unduh.
+  File sementara dihapus setelah ZIP diunduh/dibatalkan dan otomatis
+  dibersihkan setelah 24 jam.
+- Media hanya diambil dari folder uploads WordPress (tidak ada fetch URL
+  eksternal), dengan batas ukuran dari profil (`media_max_bytes`) dan whitelist
+  MIME yang sama seperti CMS.
+- Repeater/flexible content ACF belum dipetakan otomatis (CMS belum punya tipe
+  repeater); field tersebut perlu diubah menjadi field biasa atau diolah manual
+  sebelum ekspor.
+
+### Checklist cepat
+
+1. Buat content type + field di CMS, lalu simpan profil di **Content Types →
+   Profil**.
+2. Pasang plugin WordPress, tempel/ambil profil, ekspor ZIP.
+3. **Tools → Import ZIP** di CMS, periksa pratinjau (jumlah entry/media,
+   peringatan), jalankan import.
+4. Bila ada relasi antar content type, impor content type target lebih dulu.
+5. Verifikasi hasil di **Entries** dan endpoint API content type terkait.
 
 ## Webhook & Rebuild SSG
 

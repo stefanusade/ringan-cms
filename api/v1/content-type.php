@@ -29,6 +29,26 @@ if (($auth['type'] ?? '') === 'api_key') {
     }
 }
 
+// GET /{slug}/profile — profil ekspor/impor untuk plugin Ringan Export (read)
+if (!empty($profile_request)) {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
+        json_error('method_not_allowed', 'Method tidak diizinkan.', 405);
+    }
+    require_once dirname(__DIR__, 2) . '/includes/export_profile.php';
+    $profile = export_profile_effective((int) $ct['id']);
+    if ($profile === null) {
+        json_error('not_found', 'Profil ekspor tidak tersedia.', 404);
+    }
+    json_response([
+        'success' => true,
+        'data' => $profile,
+        'meta' => [
+            'site_url' => BASE_URL,
+            'stored' => export_profile_get_saved((int) $ct['id']) !== null,
+        ],
+    ]);
+}
+
 // GET /{slug}/taxonomies — daftar taksonomi + term (read)
 if (!empty($taxonomies_request)) {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {

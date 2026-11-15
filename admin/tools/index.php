@@ -31,6 +31,14 @@ if (can_write_entries($user)) {
         'url' => admin_url('import'),
         'button' => 'Buka Import',
     ];
+    $tools[] = [
+        'title' => 'Import ZIP (Ringan Export)',
+        'description' => 'Unggah ZIP hasil plugin Ringan Export di WordPress: manifest + ACF + media '
+            . 'dalam satu file. Profil JSON di dalam ZIP menentukan content type tujuan; media '
+            . 'divalidasi ulang dengan finfo dan import berjalan bertahap.',
+        'url' => admin_url('import/zip'),
+        'button' => 'Import ZIP',
+    ];
 }
 
 admin_header('Tools', 'tools');

@@ -1,0 +1,101 @@
+/* Ringan Export — halaman admin */
+.ringan-export .card {
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.ringan-export .card h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+.ringan-export-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 960px) {
+  .ringan-export-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ringan-export textarea.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  min-height: 220px;
+}
+
+.ringan-export fieldset {
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 0 0 12px;
+}
+
+.ringan-export legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.ringan-export-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 16px;
+  margin-bottom: 6px;
+}
+
+.ringan-export-fields {
+  margin-top: 8px;
+}
+
+.ringan-export-fields code {
+  white-space: nowrap;
+}
+
+.ringan-export-warn {
+  color: #b32d2e;
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+.ringan-export-errors {
+  margin: 0 0 0 18px;
+  list-style: disc;
+}
+
+.ringan-export-log {
+  max-height: 180px;
+  overflow: auto;
+  background: #f6f7f7;
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.ringan-export-log-warn {
+  color: #94660c;
+}
+
+.ringan-export-log-error {
+  color: #b32d2e;
+}
+
+.ringan-export-log-ok {
+  color: #007017;
+  font-weight: 600;
+}
+
+.ringan-export-list {
+  list-style: disc;
+  margin-left: 18px;
+}
